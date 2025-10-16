@@ -8,19 +8,34 @@ export default function DailyEntryForm() {
   const [meds, setMeds] = useState(false);
   const [behavior, setBehavior] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const entry = { food, water, poop, vomit, meds, behavior };
-    console.log("Daily Entry:", entry);
-    alert("Entry saved! Check console for details.");
-    // Reset form
+const handleSubmit = async (e) => {
+  e.preventDefault(); // voorkomt dat de pagina refresh
+  const entry = { food, water, poop, vomit, meds, behavior };
+
+  try {
+    // Stuur data naar backend
+    const response = await fetch("http://localhost:5000/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+
+    const data = await response.json();
+    alert(data.message); // laat bevestiging zien
+
+    // Reset het formulier
     setFood("");
     setWater(0);
     setPoop("");
     setVomit(false);
     setMeds(false);
     setBehavior("");
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Er is een fout opgetreden bij het opslaan.");
+  }
+};
+
 
   return (
     <div style={{ padding: "20px" }}>
