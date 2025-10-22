@@ -1,0 +1,15 @@
+version: "3.2"
+
+services:
+  frontend:
+    build: ./images/frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./images/frontend:/usr/app
+
+    store:
+    image: postgres:latest
+    ports:
+      - 5432:5432
+
