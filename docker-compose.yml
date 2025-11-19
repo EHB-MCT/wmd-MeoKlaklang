@@ -2,14 +2,28 @@ version: "3.2"
 
 services:
   frontend:
-    build: ./images/frontend
+    build: ./images/Frontend
     ports:
       - "5173:5173"
     volumes:
-      - ./images/frontend:/usr/app
+      - ./images/Frontend:/usr/app
+      - /usr/app/node_modules
 
-    store:
-    image: postgres:latest
+  backend:
+    build: ./images/Backend
     ports:
-      - 5432:5432
+      - "5000:5000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/petlog
 
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
