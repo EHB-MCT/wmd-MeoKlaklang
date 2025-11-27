@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-export default function Login() {
+export default function Register() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
-  async function handleLogin(e) {
+  async function handleRegister(e) {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/api/users/login", {
+    const res = await fetch("http://localhost:5000/api/users/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -21,7 +21,7 @@ export default function Login() {
     const data = await res.json();
 
     if (res.ok) {
-      setMessage(`✅ Welkom, ${data.name}`);
+      setMessage("✅ Account aangemaakt!");
       setTimeout(() => {
         navigate("/daily-entry");
       }, 1000);
@@ -32,8 +32,8 @@ export default function Login() {
 
   return (
     <div>
-      <h2>Login</h2>
-      <form onSubmit={handleLogin}>
+      <h2>Registreer</h2>
+      <form onSubmit={handleRegister}>
         <input
           type="text"
           placeholder="Naam"
@@ -50,13 +50,13 @@ export default function Login() {
           required
         />
         <br />
-        <button type="submit">Inloggen</button>
+        <button type="submit">Account aanmaken</button>
       </form>
       <p>{message}</p>
       <p>
-        Nog geen account?{" "}
-        <Link to="/register">
-          <button>Registreer</button>
+        Heb je al een account?{" "}
+        <Link to="/login">
+          <button>Inloggen</button>
         </Link>
       </p>
     </div>
