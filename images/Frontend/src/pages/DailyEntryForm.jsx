@@ -8,40 +8,52 @@ export default function DailyEntryForm() {
   const [meds, setMeds] = useState(false);
   const [behavior, setBehavior] = useState("");
 
-const handleSubmit = async (e) => {
-  e.preventDefault(); // voorkomt dat de pagina refresh
-  const entry = { food, water, poop, vomit, meds, behavior };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  try {
-    // Stuur data naar backend
-    const response = await fetch("http://localhost:5000/entries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entry),
-    });
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      alert("Geen gebruiker gevonden. Log opnieuw in.");
+      return;
+    }
 
-    const data = await response.json();
-    alert(data.message); // laat bevestiging zien
+    const entry = {
+      userId,
+      food,
+      water,
+      poop,
+      vomit,
+      meds,
+      behavior,
+    };
 
-    // Reset het formulier
-    setFood("");
-    setWater(0);
-    setPoop("");
-    setVomit(false);
-    setMeds(false);
-    setBehavior("");
-  } catch (err) {
-    console.error(err);
-    alert("Er is een fout opgetreden bij het opslaan.");
-  }
-};
+    try {
+      const response = await fetch("http://localhost:5000/api/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      });
 
+      const data = await response.json();
+      alert(data.message);
+
+      // Reset het formulier
+      setFood("");
+      setWater(0);
+      setPoop("");
+      setVomit(false);
+      setMeds(false);
+      setBehavior("");
+    } catch (err) {
+      console.error(err);
+      alert("Er is een fout opgetreden bij het opslaan.");
+    }
+  };
 
   return (
     <div style={{ padding: "20px" }}>
       <h2>Dagelijkse log</h2>
       <form onSubmit={handleSubmit}>
-
         <label>
           Voedselinname:
           <select value={food} onChange={(e) => setFood(e.target.value)}>

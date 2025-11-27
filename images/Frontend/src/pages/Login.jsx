@@ -21,6 +21,9 @@ export default function Login() {
     const data = await res.json();
 
     if (res.ok) {
+      // ⬅️ BELOANGRIJK: USER ID OPSLAAN
+      localStorage.setItem("userId", data._id);
+
       setMessage(`✅ Welkom, ${data.name}`);
       setTimeout(() => {
         navigate("/daily-entry");
@@ -53,6 +56,7 @@ export default function Login() {
         <button type="submit">Inloggen</button>
       </form>
       <p>{message}</p>
+
       <p>
         Nog geen account?{" "}
         <Link to="/register">

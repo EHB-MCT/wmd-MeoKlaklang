@@ -21,6 +21,9 @@ export default function Register() {
     const data = await res.json();
 
     if (res.ok) {
+      // ⬅️ BELOANGRIJK: USER ID OPSLAAN
+      localStorage.setItem("userId", data._id);
+
       setMessage("✅ Account aangemaakt!");
       setTimeout(() => {
         navigate("/daily-entry");
@@ -53,6 +56,7 @@ export default function Register() {
         <button type="submit">Account aanmaken</button>
       </form>
       <p>{message}</p>
+
       <p>
         Heb je al een account?{" "}
         <Link to="/login">
