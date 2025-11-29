@@ -7,7 +7,18 @@ const router = express.Router();
 // POST: nieuwe entry koppelen aan user
 router.post("/", async (req, res) => {
   const db = getDB();
-  const { userId, food, water, poop, vomit, meds, behavior } = req.body;
+  const {
+    userId,
+    date,
+    food,
+    water,
+    poop,
+    vomit,
+    meds,
+    behavior,
+    emotion,
+    hoveredOptions,
+  } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: "userId ontbreekt" });
@@ -15,12 +26,15 @@ router.post("/", async (req, res) => {
 
   const newEntry = {
     userId: new ObjectId(userId),
+    date: date || new Date().toISOString().split("T")[0],
     food,
     water,
     poop,
     vomit,
     meds,
     behavior,
+    emotion,
+    hoveredOptions: hoveredOptions || [],
     createdAt: new Date(),
   };
 
@@ -33,6 +47,7 @@ router.post("/", async (req, res) => {
   }
 });
 
+// GET entries per gebruiker
 router.get("/", async (req, res) => {
   const db = getDB();
   const { userId } = req.query;
