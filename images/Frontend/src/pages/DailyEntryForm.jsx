@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import "./DailyEntryForm.css";
 
 export default function DailyEntryForm() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -57,20 +59,14 @@ export default function DailyEntryForm() {
   const renderOptionButtons = (label, options, selectedValue, setter) => (
     <div>
       <strong>{label}</strong>
-      <div style={{ display: "flex", gap: "10px", margin: "10px 0" }}>
+      <div className="option-buttons">
         {options.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => setter(opt)}
             onMouseEnter={() => handleHover(opt)}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: selectedValue === opt ? "#6dd3ce" : "#eee",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
+            className={`option-button ${selectedValue === opt ? "active" : ""}`}
           >
             {opt}
           </button>
@@ -80,8 +76,16 @@ export default function DailyEntryForm() {
   );
 
   return (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
+    <div className="daily-entry-container">
       <h2>🐶 Dagelijkse log</h2>
+
+      {/* Navigatiebalk */}
+      <div className="nav-buttons">
+        <Link to="/dashboard"><button>📊 Dashboard</button></Link>
+        <Link to="/analysis"><button>🧠 Analyse</button></Link>
+        <Link to="/daily-entry"><button>📓 Logboek</button></Link>
+      </div>
+
       <form onSubmit={handleSubmit}>
         <label>
           📅 Datum:
@@ -89,11 +93,8 @@ export default function DailyEntryForm() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            style={{ marginLeft: "10px" }}
           />
         </label>
-
-        <br /><br />
 
         {renderOptionButtons("🍽️ Voedselinname:", ["Weinig", "Normaal", "Veel"], food, setFood)}
 
@@ -106,27 +107,19 @@ export default function DailyEntryForm() {
             step="50"
             value={water}
             onChange={(e) => setWater(e.target.value)}
-            style={{ marginLeft: "10px" }}
           />
         </label>
 
-        <br /><br />
-
         {renderOptionButtons("💩 Ontlasting:", ["Geen", "Hard", "Normaal", "Los", "Diarree"], poop, setPoop)}
 
-        <br />
-
         <label>
-          🤮 Overgeven:
+          🤮 Overgegeven:
           <input
             type="checkbox"
             checked={vomit}
             onChange={(e) => setVomit(e.target.checked)}
-            style={{ marginLeft: "10px" }}
           />
         </label>
-
-        <br /><br />
 
         <label>
           💊 Medicatie:
@@ -134,22 +127,14 @@ export default function DailyEntryForm() {
             type="checkbox"
             checked={meds}
             onChange={(e) => setMeds(e.target.checked)}
-            style={{ marginLeft: "10px" }}
           />
         </label>
 
-        <br /><br />
-
         {renderOptionButtons("🐾 Gedrag:", ["Actief", "Normaal", "Sloom", "Angstig"], behavior, setBehavior)}
-
-        <br />
 
         {renderOptionButtons("🧠 Hoe voelt je hond zich vandaag?", ["Blij", "Neutraal", "Verdrietig", "Gestrest"], emotion, setEmotion)}
 
-        <br />
-        <button type="submit" style={{ padding: "10px 20px" }}>
-          ✅ Opslaan
-        </button>
+        <button type="submit">✅ Opslaan</button>
       </form>
     </div>
   );
