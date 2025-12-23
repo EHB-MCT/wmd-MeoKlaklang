@@ -26,8 +26,10 @@ export default function Login() {
 			localStorage.setItem("userName", data.name); // 👈 nieuw
 
 			setMessage(`✅ Welkom, ${data.name}`);
-			setTimeout(() => {
-				navigate("/daily-entry");
+setTimeout(() => {
+				// Check if user has registered pets
+				const hasPets = localStorage.getItem('petId');
+				navigate(hasPets ? "/dashboard" : "/pet-registration");
 			}, 1000);
 		} else {
 			setMessage(`❌ Fout: ${data.error}`);

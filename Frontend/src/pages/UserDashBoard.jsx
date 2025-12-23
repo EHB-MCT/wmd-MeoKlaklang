@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function UserDashboard() {
-  const [entries, setEntries] = useState([]);
+const [entries, setEntries] = useState([]);
   const userId = localStorage.getItem("userId");
-  const userName = localStorage.getItem("userName"); // 👈 naam uit localStorage
+  const userName = localStorage.getItem("userName");
+  const petName = localStorage.getItem("petName");
 
   useEffect(() => {
     async function fetchEntries() {
@@ -27,12 +29,38 @@ export default function UserDashboard() {
 
 return (
     <div className="space-y-6">
+      {/* Navigation Bar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex flex-wrap gap-2">
+            <Link to="/daily-entry" className="btn-primary">
+              📝 Add Entry
+            </Link>
+            <Link to="/pet-registration" className="btn-secondary">
+              🐾 Pet Settings
+            </Link>
+            <Link to="/analyse" className="btn-secondary">
+              📊 Analytics
+            </Link>
+          </div>
+          <button 
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/login';
+            }}
+            className="btn-secondary text-red-600 hover:text-red-700"
+          >
+            🚪 Logout
+          </button>
+        </div>
+      </div>
+
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           🐕 Pet Dashboard
         </h1>
         <p className="text-lg text-gray-600">
-          Welcome back, {userName}! Here's your pet's health overview
+          Welcome back, {userName}! Here's {petName || 'your pet'}'s health overview
         </p>
       </div>
 

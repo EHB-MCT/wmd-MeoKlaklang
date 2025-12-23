@@ -25,8 +25,8 @@ export default function Register() {
 			localStorage.setItem("userId", data._id);
 			localStorage.setItem("userName", data.name);
 			setMessage("✅ Account aangemaakt!");
-			setTimeout(() => {
-				navigate("/daily-entry");
+setTimeout(() => {
+				navigate("/pet-registration");
 			}, 1000);
 		} else {
 			setMessage(`❌ Fout: ${data.error}`);
