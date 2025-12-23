@@ -7,6 +7,10 @@ const {
 
 const router = express.Router();
 
+const { createSession } = require("../models/Session");
+const { v4: uuidv4 } = require("uuid");
+
+
 // ✅ REGISTREREN: nieuwe gebruiker aanmaken
 router.post("/register", async (req, res) => {
   const { name, password } = req.body;
