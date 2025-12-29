@@ -26,7 +26,7 @@ export default function Register() {
 			localStorage.setItem("userName", data.name);
 			setMessage("✅ Account aangemaakt!");
 			setTimeout(() => {
-				navigate("/daily-entry");
+				navigate("/my-dogs");
 			}, 1000);
 		} else {
 			setMessage(`❌ Fout: ${data.error}`);

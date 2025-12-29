@@ -7,6 +7,8 @@ export default function MyDogs() {
   const userId = localStorage.getItem("userId");
 
   const [dogs, setDogs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editingDog, setEditingDog] = useState(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -23,14 +25,58 @@ export default function MyDogs() {
   useEffect(() => {
     if (!userId) return;
 
-    fetch(`http://localhost:5001/api/dogs/${userId}`)
+    fetch(`http://localhost:5002/api/dogs/${userId}`)
       .then((res) => res.json())
       .then((data) => setDogs(data))
       .catch((err) => console.error(err));
   }, [userId]);
 
   /* =========================
-     SUBMIT NIEUWE HOND
+     FORM CONTROLS
+  ========================= */
+  const resetForm = () => {
+    setName("");
+    setBreed("");
+    setAge("");
+    setWeight("");
+    setFoodType("");
+    setToys("");
+    setNotes("");
+    setEditingDog(null);
+  };
+
+  const editDog = (dog) => {
+    setEditingDog(dog);
+    setName(dog.name);
+    setBreed(dog.breed);
+    setAge(dog.age || "");
+    setWeight(dog.weight || "");
+    setFoodType(dog.foodType || "");
+    setToys(dog.toys ? dog.toys.join(", ") : "");
+    setNotes(dog.notes || "");
+  };
+
+  const deleteDog = async (dogId) => {
+    if (!confirm("Weet je zeker dat je deze hond wilt verwijderen?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:5002/api/dogs/${dogId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("Fout bij verwijderen hond");
+      }
+
+      setDogs(prev => prev.filter(d => d._id !== dogId));
+    } catch (err) {
+      console.error("Error deleting dog:", err);
+      alert(`Fout bij verwijderen hond: ${err.message}`);
+    }
+  };
+
+  /* =========================
+     SUBMIT NIEUWE/UPDATE HOND
   ========================= */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,23 +86,35 @@ export default function MyDogs() {
       return;
     }
 
-    const newDog = {
+    setLoading(true);
+    const dogData = {
       userId,
       name,
       breed,
-      age,
-      weight,
+      age: age ? Number(age) : null,
+      weight: weight ? Number(weight) : null,
       foodType,
-      toys: toys.split(",").map((t) => t.trim()),
+      toys: toys.split(",").map((t) => t.trim()).filter(t => t),
       notes,
     };
 
     try {
-      const res = await fetch("http://localhost:5001/api/dogs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newDog),
-      });
+      let res;
+      if (editingDog) {
+        // Update existing dog
+        res = await fetch(`http://localhost:5002/api/dogs/${editingDog._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dogData),
+        });
+      } else {
+        // Add new dog
+        res = await fetch("http://localhost:5002/api/dogs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dogData),
+        });
+      }
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -64,91 +122,271 @@ export default function MyDogs() {
       }
 
       const data = await res.json();
-      setDogs((prev) => [...prev, data]);
+      
+      if (editingDog) {
+        // Update the dog in state with the response data
+        setDogs(prev => prev.map(d => d._id === editingDog._id ? data : d));
+      } else {
+        setDogs(prev => [...prev, data]);
+      }
 
-      // reset form
-      setName("");
-      setBreed("");
-      setAge("");
-      setWeight("");
-      setFoodType("");
-      setToys("");
-      setNotes("");
+      resetForm();
+      alert(editingDog ? "Hond bijgewerkt! 🐕" : "Hond toegevoegd! 🐕");
     } catch (err) {
-      console.error("Error adding dog:", err);
+      console.error("Error saving dog:", err);
       alert(`Fout bij opslaan hond: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* =========================
+     RENDER
+  ========================= */
   return (
-    <div className="my-dogs-container">
-      <h2>🐕 Mijn Dieren</h2>
-      <p className="soft-warning">
-        Voeg eerst je hond(en) toe om het dagboek te kunnen gebruiken.
-      </p>
+    <div className="enhanced-my-dogs-container">
+      {/* HEADER */}
+      <header className="page-header">
+        <h1>🐕 Mijn Honden</h1>
+        <p className="subtitle">Beheer je hondenprofielen en dagboekgegevens</p>
+      </header>
 
       {/* NAVIGATIE */}
-      <div className="nav-buttons">
-        <button onClick={() => navigate("/my-dogs")}>🐕 Mijn dieren</button>
-        <button onClick={() => navigate("/daily-entry")}>📓 Logboek</button>
-        <button onClick={() => navigate("/profile")}>👤 Profiel</button>
-      </div>
+      <nav className="nav-bar">
+        <button onClick={() => navigate("/my-dogs")} className="nav-btn active">🐕 Mijn dieren</button>
+        <button onClick={() => navigate("/daily-entry")} className="nav-btn">📓 Logboek</button>
+        <button onClick={() => navigate("/profile")} className="nav-btn">👤 Profiel</button>
+      </nav>
 
-      {/* BESTAANDE HONDEN */}
-      {dogs.length > 0 && (
-        <div className="dog-list">
-          <h3>Je honden</h3>
-          {dogs.map((dog) => (
-            <div key={dog._id} className="dog-card">
-              <strong>{dog.name}</strong>
-              <span>{dog.breed}</span>
-              {dog.age && <span>Leeftijd: {dog.age}</span>}
+      <div className="main-content">
+        {/* DOGS OVERVIEW */}
+        <section className="dogs-overview">
+          <div className="section-header">
+            <h2>🐾 Hondenprofielen</h2>
+            <span className="dog-count">{dogs.length} hond{dogs.length !== 1 ? 'en' : ''}</span>
+          </div>
+
+          {dogs.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🐕</div>
+              <h3>Geen honden toegevoegd</h3>
+              <p>Voeg je eerste hond toe om het dagboek te kunnen gebruiken</p>
+              <button 
+                onClick={() => document.querySelector('.dog-form-section').scrollIntoView({ behavior: 'smooth' })}
+                className="cta-button"
+              >
+                ➕ Eerste hond toevoegen
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="dogs-grid">
+              {dogs.map((dog) => (
+                <div key={dog._id} className="dog-profile-card">
+                  <div className="dog-card-header">
+                    <div className="dog-avatar">
+                      {dog.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="dog-status">
+                      <span className="status-dot"></span>
+                    </div>
+                  </div>
+                  
+                  <div className="dog-info">
+                    <h3>{dog.name}</h3>
+                    <p className="breed">{dog.breed}</p>
+                    
+                    <div className="dog-details">
+                      {dog.age && (
+                        <div className="detail-item">
+                          <span className="detail-icon">🎂</span>
+                          <span>{dog.age} jaar</span>
+                        </div>
+                      )}
+                      {dog.weight && (
+                        <div className="detail-item">
+                          <span className="detail-icon">⚖️</span>
+                          <span>{dog.weight} kg</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {dog.toys && dog.toys.length > 0 && (
+                      <div className="toys-section">
+                        <span className="toys-label">Speeltjes:</span>
+                        <div className="toys-list">
+                          {dog.toys.slice(0, 3).map((toy, index) => (
+                            <span key={index} className="toy-tag">{toy}</span>
+                          ))}
+                          {dog.toys.length > 3 && (
+                            <span className="toy-tag more">+{dog.toys.length - 3}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {dog.notes && (
+                      <div className="notes-section">
+                        <span className="notes-label">Opmerkingen:</span>
+                        <p className="notes-text">{dog.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="dog-actions">
+                    <button 
+                      onClick={() => editDog(dog)}
+                      className="action-btn edit-btn"
+                      title="Bewerken"
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                      onClick={() => navigate(`/daily-entry?dogId=${dog._id}`)}
+                      className="action-btn log-btn"
+                      title="Logboek invullen"
+                    >
+                      📝
+                    </button>
+                    <button 
+                      onClick={() => deleteDog(dog._id)}
+                      className="action-btn delete-btn"
+                      title="Verwijderen"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* NIEUWE HOND TOEVOEGEN */}
-      <form onSubmit={handleSubmit} className="dog-form">
-        <h3>➕ Hond toevoegen</h3>
+        {/* FORM SECTION */}
+        <section className="dog-form-section">
+          <div className="form-header">
+            <h2>{editingDog ? '✏️ Hond bewerken' : '➕ Nieuwe hond toevoegen'}</h2>
+            {editingDog && (
+              <button 
+                onClick={resetForm}
+                className="cancel-btn"
+              >
+                Annuleren
+              </button>
+            )}
+          </div>
 
-        <label>
-          Naam *
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
+          <form onSubmit={handleSubmit} className="enhanced-dog-form">
+            <div className="form-grid">
+              <div className="form-column">
+                <div className="form-group">
+                  <label className="form-label">Naam *</label>
+                  <input 
+                    type="text"
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)} 
+                    className="form-input"
+                    placeholder="Bijv: Max"
+                    required
+                  />
+                </div>
 
-        <label>
-          Ras *
-          <input value={breed} onChange={(e) => setBreed(e.target.value)} />
-        </label>
+                <div className="form-group">
+                  <label className="form-label">Ras *</label>
+                  <input 
+                    type="text"
+                    value={breed} 
+                    onChange={(e) => setBreed(e.target.value)} 
+                    className="form-input"
+                    placeholder="Bijv: Golden Retriever"
+                    required
+                  />
+                </div>
 
-        <label>
-          Leeftijd (jaren)
-          <input type="number" value={age} onChange={(e) => setAge(e.target.value)} />
-        </label>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Leeftijd (jaren)</label>
+                    <input 
+                      type="number"
+                      value={age} 
+                      onChange={(e) => setAge(e.target.value)} 
+                      className="form-input"
+                      placeholder="5"
+                      min="0"
+                      max="30"
+                    />
+                  </div>
 
-        <label>
-          Gewicht (kg)
-          <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
-        </label>
+                  <div className="form-group">
+                    <label className="form-label">Gewicht (kg)</label>
+                    <input 
+                      type="number"
+                      value={weight} 
+                      onChange={(e) => setWeight(e.target.value)} 
+                      className="form-input"
+                      placeholder="25"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+              </div>
 
-        <label>
-          Voeding
-          <input value={foodType} onChange={(e) => setFoodType(e.target.value)} />
-        </label>
+              <div className="form-column">
+                <div className="form-group">
+                  <label className="form-label">Voeding</label>
+                  <input 
+                    type="text"
+                    value={foodType} 
+                    onChange={(e) => setFoodType(e.target.value)} 
+                    className="form-input"
+                    placeholder="Bijv: Royal Canin, brokken"
+                  />
+                </div>
 
-        <label>
-          Speeltjes (komma-gescheiden)
-          <input value={toys} onChange={(e) => setToys(e.target.value)} />
-        </label>
+                <div className="form-group">
+                  <label className="form-label">Speeltjes (komma-gescheiden)</label>
+                  <textarea 
+                    value={toys} 
+                    onChange={(e) => setToys(e.target.value)} 
+                    className="form-textarea"
+                    placeholder="Bijv: bal, knuffel, frisbee"
+                    rows="3"
+                  />
+                </div>
 
-        <label>
-          Extra opmerkingen
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </label>
+                <div className="form-group">
+                  <label className="form-label">Extra opmerkingen</label>
+                  <textarea 
+                    value={notes} 
+                    onChange={(e) => setNotes(e.target.value)} 
+                    className="form-textarea"
+                    placeholder="Bijv: allergieën, speciale behoeften..."
+                    rows="4"
+                  />
+                </div>
+              </div>
+            </div>
 
-        <button type="submit">✅ Hond opslaan</button>
-      </form>
+            <div className="form-actions">
+              <button 
+                type="button" 
+                onClick={resetForm}
+                className="secondary-btn"
+              >
+                Wissen
+              </button>
+              <button 
+                type="submit" 
+                className="primary-btn"
+                disabled={loading}
+              >
+                {loading ? '⏳ Opslaan...' : (editingDog ? '✅ Bewerken' : '➕ Toevoegen')}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Register from "./pages/Register";
 import DailyEntryForm from "./pages/DailyEntryForm";
 import UserDashBoard from "./pages/UserDashBoard"; 
 import Analyse from "./pages/Analyse";
+import MyDogs from "./pages/MyDogs";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/daily-entry" element={<DailyEntryForm />} />
         <Route path="/dashboard" element={<UserDashBoard />} /> 
         <Route path="/analyse" element={<Analyse />} /> 
+        <Route path="/my-dogs" element={<MyDogs />} />
 
       </Routes>
     </Router>

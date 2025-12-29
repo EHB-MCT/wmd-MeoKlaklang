@@ -27,7 +27,7 @@ export default function Login() {
 
 			setMessage(`✅ Welkom, ${data.name}`);
 			setTimeout(() => {
-				navigate("/daily-entry");
+				navigate("/my-dogs");
 			}, 1000);
 		} else {
 			setMessage(`❌ Fout: ${data.error}`);
