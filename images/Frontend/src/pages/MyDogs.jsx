@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEventTracker } from "../hooks/useEventTracker";
 import "./MyDogs.css";
 
 export default function MyDogs() {
   const navigate = useNavigate();
   const userId = localStorage.getItem("userId");
-  const { trackFormField, trackFormSubmit, trackNavigation } = useEventTracker();
 
   const [dogs, setDogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +25,7 @@ export default function MyDogs() {
   useEffect(() => {
     if (!userId) return;
 
-    fetch(`http://localhost:5002/api/dogs/${userId}`)
+    fetch(`/api/dogs/${userId}`)
       .then((res) => res.json())
       .then((data) => setDogs(data))
       .catch((err) => console.error(err));
@@ -62,7 +60,7 @@ export default function MyDogs() {
     if (!confirm("Weet je zeker dat je deze hond wilt verwijderen?")) return;
 
     try {
-      const res = await fetch(`http://localhost:5002/api/dogs/${dogId}`, {
+      const res = await fetch(`/api/dogs/${dogId}`, {
         method: "DELETE",
       });
 
@@ -104,14 +102,14 @@ export default function MyDogs() {
       let res;
       if (editingDog) {
         // Update existing dog
-        res = await fetch(`http://localhost:5002/api/dogs/${editingDog._id}`, {
+        res = await fetch(`/api/dogs/${editingDog._id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(dogData),
         });
       } else {
         // Add new dog
-        res = await fetch("http://localhost:5002/api/dogs", {
+        res = await fetch("/api/dogs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(dogData),
@@ -155,12 +153,11 @@ export default function MyDogs() {
 
       {/* NAVIGATIE */}
         <nav className="nav-bar">
-          <button onClick={() => trackNavigation("/my-dogs", "/my-dogs")}>🐕 Mijn dieren</button>
-          <button onClick={() => trackNavigation("/my-dogs", "/daily-entry")}>📓 Logboek</button>
-          <button className="active">🐕 Mijn dieren</button>
-          <button onClick={() => trackNavigation("/my-dogs", "/dashboard")}>📈 Dashboard</button>
-          <button onClick={() => trackNavigation("/my-dogs", "/profile")}>👤 Profiel</button>
-          <button onClick={() => trackNavigation("/my-dogs", "/analytics")}>📊 Analyse</button>
+          <button onClick={() => navigate("/my-dogs")}>🐕 Mijn dieren</button>
+          <button onClick={() => navigate("/daily-entry")}>📓 Logboek</button>
+          <button onClick={() => navigate("/dashboard")}>📈 Dashboard</button>
+          <button onClick={() => navigate("/profile")}>👤 Profiel</button>
+          <button onClick={() => navigate("/analytics")}>📊 Analyse</button>
         </nav>
 
       <div className="main-content">

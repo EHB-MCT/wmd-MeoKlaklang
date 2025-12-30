@@ -1,17 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEventTracker } from "../hooks/useEventTracker";
 import "./DailyEntryForm.css";
 
 export default function DailyEntryForm() {
   const navigate = useNavigate();
-  const { 
-    trackFormField, 
-    trackFormValidation, 
-    trackFormSubmit,
-    trackNavigation,
-    trackPageView 
-  } = useEventTracker();
   
   /* =========================
      BASIS
@@ -69,11 +61,11 @@ export default function DailyEntryForm() {
   useEffect(() => {
     if (!userId) return;
 
-    fetch(`http://localhost:5002/api/entries?userId=${userId}`)
+    fetch(`/api/entries?userId=${userId}`)
       .then((res) => res.json())
       .then((data) => setEntries(data))
       .catch((err) => console.error("Error fetching entries:", err));
-  }, [userId, trackPageView]);
+  }, [userId]);
 
   /* =========================
      CALENDAR FUNCTIONS
@@ -190,7 +182,7 @@ export default function DailyEntryForm() {
   useEffect(() => {
     if (!userId) return;
 
-    fetch(`http://localhost:5002/api/dogs/${userId}`)
+    fetch(`/api/dogs/${userId}`)
       .then((res) => res.json())
       .then((data) => setDogs(data))
       .catch((err) => console.error(err));
@@ -291,7 +283,7 @@ export default function DailyEntryForm() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5002/api/entries", {
+      const response = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry),
@@ -325,7 +317,7 @@ export default function DailyEntryForm() {
       setOwnerConcern("");
       
       // Refresh entries to update calendar and stats
-      const entriesResponse = await fetch(`http://localhost:5002/api/entries?userId=${userId}`);
+      const entriesResponse = await fetch(`/api/entries?userId=${userId}`);
       const entriesData = await entriesResponse.json();
       setEntries(entriesData);
       

@@ -1,21 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useEventTracker } from "../hooks/useEventTracker";
 
 export default function Login() {
 	const [name, setName] = useState("");
 	const [password, setPassword] = useState("");
 	const [message, setMessage] = useState("");
 	const navigate = useNavigate();
-	const { trackLoginAttempt, trackCustomEvent } = useEventTracker();
 
 	async function handleLogin(e) {
 		e.preventDefault();
 
-		// Track login attempt
-		trackLoginAttempt(name, false);
-
-		const res = await fetch("http://localhost:5002/api/users/login", {
+		const res = await fetch("/api/users/login", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -30,24 +25,11 @@ export default function Login() {
 			localStorage.setItem("userId", data._id);
 			localStorage.setItem("userName", data.name); // 👈 nieuw
 
-			// Track successful login
-			trackLoginAttempt(name, true);
-			
-			// Track login form submission
-			trackCustomEvent('form_submit', {
-				formName: 'login',
-				success: true,
-				formData: { name: name.length > 0, password: password.length > 0 },
-				fieldCount: 2
-			});
-
 			setMessage(`✅ Welkom, ${data.name}`);
 			setTimeout(() => {
 				navigate("/my-dogs");
 			}, 1000);
 		} else {
-			// Track failed login
-			trackLoginAttempt(name, false, data.error);
 			setMessage(`❌ Fout: ${data.error}`);
 		}
 	}

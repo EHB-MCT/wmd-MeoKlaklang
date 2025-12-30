@@ -9,7 +9,7 @@ export default function Register() {
   const [isAdminRequest, setIsAdminRequest] = useState(false);
 
   const navigate = useNavigate();
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5003";
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost";
 
   // One handler for both inputs (uses input "name" attribute)
   const handleChange = (e) => {
@@ -31,7 +31,7 @@ export default function Register() {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/users`, {
+      const res = await fetch(`${API_BASE}/api/users/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
