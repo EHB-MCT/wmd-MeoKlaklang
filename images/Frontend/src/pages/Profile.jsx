@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEventTracker } from "../hooks/useEventTracker";
 import "./Profile.css";
 
 export default function Profile() {
   const navigate = useNavigate();
   const userId = localStorage.getItem("userId");
+  const { trackNavigation } = useEventTracker();
 
   const [dogs, setDogs] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -216,9 +218,17 @@ export default function Profile() {
          </header>
 
          <nav className="nav-bar">
-           <button onClick={() => navigate("/my-dogs")}>🐕 Mijn dieren</button>
-           <button onClick={() => navigate("/daily-entry")}>📓 Logboek</button>
-           <button className="active">👤 Profiel</button>
+        <button onClick={() => trackNavigation("/profile", "/my-dogs")}>🐕 Mijn dieren</button>
+        <button onClick={() => trackNavigation("/profile", "/daily-entry")}>📓 Logboek</button>
+        <button className="active">👤 Profiel</button>
+        <button 
+          className={user?.role === 'admin' ? 'admin-nav-btn' : 'hidden'}
+          onClick={() => trackNavigation("/profile", "/analytics")}
+        >
+          🔐 Admin
+        </button>
+        <button onClick={() => trackNavigation("/profile", "/analytics")}>📊 Analyse</button>
+        <button onClick={() => trackNavigation("/profile", "/admin/login")}>🔐 Admin</button>
          </nav>
 
          <div className="empty-state">

@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEventTracker } from "../hooks/useEventTracker";
 import "./DailyEntryForm.css";
 
 export default function DailyEntryForm() {
   const navigate = useNavigate();
-
+  const { 
+    trackFormField, 
+    trackFormValidation, 
+    trackFormSubmit,
+    trackNavigation,
+    trackPageView 
+  } = useEventTracker();
+  
   /* =========================
      BASIS
   ========================= */
@@ -65,7 +73,7 @@ export default function DailyEntryForm() {
       .then((res) => res.json())
       .then((data) => setEntries(data))
       .catch((err) => console.error("Error fetching entries:", err));
-  }, [userId]);
+  }, [userId, trackPageView]);
 
   /* =========================
      CALENDAR FUNCTIONS

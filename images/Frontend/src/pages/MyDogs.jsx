@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEventTracker } from "../hooks/useEventTracker";
 import "./MyDogs.css";
 
 export default function MyDogs() {
   const navigate = useNavigate();
   const userId = localStorage.getItem("userId");
+  const { trackFormField, trackFormSubmit, trackNavigation } = useEventTracker();
 
   const [dogs, setDogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -152,11 +154,14 @@ export default function MyDogs() {
       </header>
 
       {/* NAVIGATIE */}
-      <nav className="nav-bar">
-        <button onClick={() => navigate("/my-dogs")} className="nav-btn active">🐕 Mijn dieren</button>
-        <button onClick={() => navigate("/daily-entry")} className="nav-btn">📓 Logboek</button>
-        <button onClick={() => navigate("/profile")} className="nav-btn">👤 Profiel</button>
-      </nav>
+        <nav className="nav-bar">
+          <button onClick={() => trackNavigation("/my-dogs", "/my-dogs")}>🐕 Mijn dieren</button>
+          <button onClick={() => trackNavigation("/my-dogs", "/daily-entry")}>📓 Logboek</button>
+          <button className="active">🐕 Mijn dieren</button>
+          <button onClick={() => trackNavigation("/my-dogs", "/dashboard")}>📈 Dashboard</button>
+          <button onClick={() => trackNavigation("/my-dogs", "/profile")}>👤 Profiel</button>
+          <button onClick={() => trackNavigation("/my-dogs", "/analytics")}>📊 Analyse</button>
+        </nav>
 
       <div className="main-content">
         {/* DOGS OVERVIEW */}
