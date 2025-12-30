@@ -10,7 +10,7 @@ export default function Register() {
 	async function handleRegister(e) {
 		e.preventDefault();
 
-		const res = await fetch("http://localhost:5000/api/users/register", {
+		const res = await fetch("http://localhost:5002/api/users/register", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

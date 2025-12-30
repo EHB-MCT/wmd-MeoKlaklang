@@ -8,7 +8,7 @@ export default function UserDashboard() {
   useEffect(() => {
     async function fetchEntries() {
       try {
-        const res = await fetch(`http://localhost:5000/api/entries?userId=${userId}`);
+        const res = await fetch(`http://localhost:5002/api/entries?userId=${userId}`);
         const data = await res.json();
         setEntries(data);
       } catch (err) {
