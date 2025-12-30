@@ -15,6 +15,10 @@ app.use("/api/users", userRoutes);
 app.use("/api/entries", entryRoutes);
 app.use("/api/dogs", dogsRoutes);
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 connectDB().then(() => {
   app.listen(5002, () => console.log("✅ Backend running on http://localhost:5002"));

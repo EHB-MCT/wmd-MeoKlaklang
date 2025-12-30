@@ -12,8 +12,8 @@ export default function Profile() {
   const [expandedDog, setExpandedDog] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState("week");
 
-  // ✅ Backend draait op poort 5002
-  const API_BASE = "http://localhost:5002";
+  // ✅ Backend URL - configurable via environment variable
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002";
 
   useEffect(() => {
     if (!userId) {

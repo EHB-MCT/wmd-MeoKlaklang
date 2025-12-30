@@ -1,28 +1,34 @@
-
+version: "3.8"
 
 services:
   frontend:
     build: 
       context: ./images/Frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
-      - "80:80"
+      - "5173:5173"
+    volumes:
+      - ./images/Frontend:/app
+      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:5003
+      - VITE_API_URL=http://localhost:5002
     depends_on:
       - backend
 
   backend:
     build: 
       context: ./images/Backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
-      - "5003:5002"
+      - "5002:5002"
+    volumes:
+      - ./images/Backend:/usr/src/app
+      - /usr/src/app/node_modules
     depends_on:
       - mongo
     environment:
       - MONGO_URL=mongodb://mongo:27017/petlog
-      - NODE_ENV=production
+      - NODE_ENV=development
 
   mongo:
     image: mongo:7
