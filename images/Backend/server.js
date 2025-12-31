@@ -56,5 +56,5 @@ app.get("/health", (req, res) => {
 });
 
 connectDB().then(() => {
-  app.listen(5002, () => console.log("✅ Backend running on http://localhost:5002"));
+  app.listen(5005, () => console.log("✅ Backend running on http://localhost:5005"));
 });

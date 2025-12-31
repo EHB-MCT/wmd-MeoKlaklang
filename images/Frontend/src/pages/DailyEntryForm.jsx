@@ -346,6 +346,10 @@ export default function DailyEntryForm() {
         <button onClick={() => navigate("/my-dogs")} className="nav-btn">🐕 Mijn dieren</button>
         <button onClick={() => navigate("/profile")} className="nav-btn">👤 Profiel</button>
         <button onClick={() => navigate("/notifications")} className="nav-btn">🔔 Meldingen</button>
+        <button onClick={() => {
+          localStorage.clear();
+          navigate("/login");
+        }} className="nav-btn logout-button">🚪 Uitloggen</button>
       </nav>
 
       <div className="main-content">

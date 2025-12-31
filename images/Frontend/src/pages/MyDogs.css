@@ -6,21 +6,41 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Inter", "Segoe UI", "Roboto", sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #2d3748;
   min-height: 100vh;
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* ========== MAIN CONTAINER ========== */
 .enhanced-my-dogs-container {
-  max-width: 1400px;
+  width: 100%;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   min-height: 100vh;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ========== HEADER ========== */
@@ -78,6 +98,17 @@ body {
 .nav-btn.active {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+}
+
+.nav-bar .logout-button {
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  color: white;
+  margin-left: auto;
+}
+
+.nav-bar .logout-button:hover {
+  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  transform: translateY(-2px);
 }
 
 /* ========== MAIN CONTENT ========== */

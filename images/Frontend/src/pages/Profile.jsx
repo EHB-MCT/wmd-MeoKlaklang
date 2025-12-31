@@ -10,10 +10,17 @@ export default function Profile() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedDog, setExpandedDog] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState("week");
+  const [selectedPeriod, setSelectedPeriod] = useState("period");
 
-  // ✅ Backend URL - configurable via environment variable
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost";
+  const handleAdminClick = () => {
+    const userRole = localStorage.getItem("userRole");
+    
+    if (userRole === "admin" || userRole === "manager") {
+      navigate("/admin/dashboard");
+    } else {
+      navigate("/admin/login");
+    }
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -24,8 +31,8 @@ export default function Profile() {
     const fetchData = async () => {
       try {
         const [dogsRes, entriesRes] = await Promise.all([
-          fetch(`${API_BASE}/api/dogs/${userId}`),
-          fetch(`${API_BASE}/api/entries?userId=${userId}`),
+          fetch(`/api/dogs/${userId}`),
+          fetch(`/api/entries?userId=${userId}`),
         ]);
 
         const dogsData = await dogsRes.json();
@@ -215,12 +222,15 @@ export default function Profile() {
            </div>
          </header>
 
-         <nav className="nav-bar">
+           <nav className="nav-bar">
         <button onClick={() => navigate("/my-dogs")}>🐕 Mijn dieren</button>
         <button onClick={() => navigate("/daily-entry")}>📓 Logboek</button>
-          onClick={() => navigate("/analytics")}
         <button onClick={() => navigate("/analytics")}>📊 Analyse</button>
-        <button onClick={() => navigate("/admin/login")}>🔐 Admin</button>
+          <button onClick={handleAdminClick}>🔐 Admin</button>
+        <button onClick={() => {
+          localStorage.clear();
+          navigate("/login");
+        }} className="logout-button">🚪 Uitloggen</button>
          </nav>
 
          <div className="empty-state">

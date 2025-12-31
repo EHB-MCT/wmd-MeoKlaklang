@@ -3,6 +3,7 @@ const {
   createUser,
   findUserByName,
   validatePassword,
+  createAdminUser,
 } = require("../models/User");
 
 const router = express.Router();
@@ -13,7 +14,7 @@ const { v4: uuidv4 } = require("uuid");
 
 // ✅ REGISTREREN: nieuwe gebruiker aanmaken
 router.post("/register", async (req, res) => {
-  const { name, password } = req.body;
+  const { name, password, isAdmin } = req.body;
 
   if (!name || !password) {
     return res.status(400).json({ error: "Name and password required" });
@@ -24,7 +25,13 @@ router.post("/register", async (req, res) => {
     return res.status(409).json({ error: "User already exists" });
   }
 
-  const newUser = await createUser(name, password);
+  let newUser;
+  if (isAdmin) {
+    newUser = await createAdminUser(name, password);
+  } else {
+    newUser = await createUser(name, password);
+  }
+  
   res.status(201).json(newUser);
 });
 
@@ -42,7 +49,7 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  res.json({ _id: user._id, name: user.name });
+  res.json({ _id: user._id, name: user.name, role: user.role });
 });
 
 module.exports = router;

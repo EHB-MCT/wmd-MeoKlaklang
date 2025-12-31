@@ -167,10 +167,23 @@ router.get("/stats", async (req, res) => {
   try {
     const db = require("../db").getDB();
     
+    // User statistics
     const totalUsers = await db.collection("users").countDocuments();
     const activeUsers = await db.collection("users").countDocuments({ isActive: true });
-    const totalEvents = await db.collection("events").countDocuments();
-    const totalSessions = await db.collection("events").distinct("sessionId").then(sessions => sessions.length);
+    const adminUsers = await db.collection("users").countDocuments({ role: "admin" });
+    const managerUsers = await db.collection("users").countDocuments({ role: "manager" });
+    const regularUsers = await db.collection("users").countDocuments({ role: "user" });
+    
+    // Dog statistics
+    const totalDogs = await db.collection("dogs").countDocuments();
+    const activeDogs = await db.collection("dogs").distinct("userId").then(users => users.length);
+    
+    // Entry statistics
+    const totalEntries = await db.collection("entries").countDocuments();
+    
+    // Session statistics (using entries as proxy for activity)
+    const totalSessions = await db.collection("entries").countDocuments();
+    const uniqueSessionUsers = await db.collection("entries").distinct("userId").then(users => users.length);
     
     // Get user role distribution
     const roleStats = await db.collection("users").aggregate([
@@ -182,19 +195,66 @@ router.get("/stats", async (req, res) => {
       }
     ]).toArray();
     
-    // Get last 30 days activity
+    // Get last 30 days activity (using entries)
     const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
-    const recentEvents = await db.collection("events").countDocuments({
-      timestamp: { $gte: thirtyDaysAgo }
+    const recentEvents = await db.collection("entries").countDocuments({
+      date: { $gte: thirtyDaysAgo }
     });
+    
+    const recentEntries = await db.collection("entries").countDocuments({
+      date: { $gte: thirtyDaysAgo }
+    });
+    
+    // Recent registrations (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+    const recentRegistrations = await db.collection("users").countDocuments({
+      createdAt: { $gte: sevenDaysAgo }
+    });
+    
+    // Most popular dog breeds
+    const popularBreeds = await db.collection("dogs").aggregate([
+      { $group: { _id: "$breed", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]).toArray();
+    
+    // User growth (last 6 months)
+    const sixMonthsAgo = new Date(Date.now() - (180 * 24 * 60 * 60 * 1000));
+    const userGrowth = await db.collection("users").aggregate([
+      {
+        $match: { createdAt: { $gte: sixMonthsAgo } }
+      },
+      {
+        $group: {
+          _id: { 
+            month: { $month: "$createdAt" },
+            year: { $year: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]).toArray();
     
     res.json({
       overview: {
         totalUsers,
         activeUsers,
-        totalEvents,
+        totalDogs,
+        activeDogs,
+        totalEntries,
         totalSessions,
-        recentEvents
+        uniqueSessionUsers,
+        recentEvents,
+        recentEntries,
+        recentRegistrations
+      },
+      detailedStats: {
+        adminUsers,
+        managerUsers,
+        regularUsers,
+        popularBreeds,
+        userGrowth
       },
       roleDistribution: roleStats,
       lastUpdated: new Date()

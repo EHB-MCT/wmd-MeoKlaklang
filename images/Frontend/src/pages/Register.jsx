@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "./Register.css";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -7,9 +8,8 @@ export default function Register() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [isAdminRequest, setIsAdminRequest] = useState(false);
-
   const navigate = useNavigate();
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost";
+
 
   // One handler for both inputs (uses input "name" attribute)
   const handleChange = (e) => {
@@ -31,7 +31,7 @@ export default function Register() {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/users/register`, {
+      const res = await fetch(`/api/users/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -96,7 +96,7 @@ export default function Register() {
         </div>
 
         <div className="form-group checkbox-group">
-          <label className="checkbox-container">
+          <div className="checkbox-wrapper">
             <input
               type="checkbox"
               id="isAdmin"
@@ -104,18 +104,18 @@ export default function Register() {
               onChange={(e) => setIsAdminRequest(e.target.checked)}
               disabled={loading}
             />
-            <span className="checkbox-text">Wil je een administrator worden?</span>
-          </label>
+            <label htmlFor="isAdmin">Wil je een administrator worden?</label>
+          </div>
         </div>
 
         <button
           type="submit"
-          className={`register-btn ${loading ? "loading" : ""}`}
+          className={`submit-button ${loading ? "loading" : ""}`}
           disabled={loading}
         >
           {loading ? (
             <>
-              <span className="spinner"></span>
+              <span className="loading-spinner"></span>
               Registreren...
             </>
           ) : (
@@ -129,11 +129,11 @@ export default function Register() {
           </div>
         )}
 
-        <div className="login-links">
-          <span>Al een account? </span>
-          <button type="button" onClick={() => navigate("/login")} disabled={loading}>
-            Inloggen
-          </button>
+        <div className="login-link">
+          Al een account?{" "}
+          <span onClick={() => navigate("/login")} style={{ cursor: 'pointer', color: '#667eea', fontWeight: '600' }}>
+            Log hier in
+          </span>
         </div>
       </form>
     </div>
