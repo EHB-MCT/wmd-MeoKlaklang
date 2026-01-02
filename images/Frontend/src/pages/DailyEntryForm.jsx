@@ -10,6 +10,8 @@ export default function DailyEntryForm() {
      BASIS
   ========================= */
   const userId = localStorage.getItem("userId");
+  const storedSessionId = localStorage.getItem("sessionId");
+
   const [dogs, setDogs] = useState([]);
   const [dogId, setDogId] = useState("");
   const [dogSelected, setDogSelected] = useState(false);
@@ -117,8 +119,15 @@ export default function DailyEntryForm() {
      PAGE VIEW / EXIT
   ========================= */
   useEffect(() => {
-    analytics?.track?.("page_view", {
-      page: "daily-entry",
+    // If user refreshed and analytics was not started, try to start it from localStorage.
+    // This is safe: analytics.start() will just enable tracking when IDs exist.
+    if (userId && storedSessionId) {
+      analytics.start(userId, storedSessionId);
+    }
+
+    // Track a page view for this page
+    analytics.track("page_view", {
+      route: "/daily-entry",
       selectedDate,
       dogSelected: false,
       dogId: null,
@@ -128,14 +137,13 @@ export default function DailyEntryForm() {
       const timeOnPageMs = Date.now() - pageStartTsRef.current;
       const progressPercent = calculateProgress();
 
-      // optionChangeCounts -> plain object
       const optionChangeCounts = {};
       optionChangeCountsRef.current.forEach((v, k) => {
         optionChangeCounts[k] = v;
       });
 
       return {
-        page: "daily-entry",
+        route: "/daily-entry",
         timeOnPageMs,
         progressPercent,
         dogSelected,
@@ -148,18 +156,16 @@ export default function DailyEntryForm() {
     };
 
     const onBeforeUnload = () => {
-      // We try to flush via analytics util if it supports it
-      analytics?.track?.("page_exit", buildExitPayload());
-      analytics?.flush?.({ beacon: true });
+      analytics.track("page_exit", buildExitPayload());
+      analytics.flush(true); // beacon best-effort
     };
 
     window.addEventListener("beforeunload", onBeforeUnload);
 
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      analytics?.track?.("page_exit", buildExitPayload());
-      analytics?.flush?.({ beacon: false });
-      analytics?.destroy?.();
+      analytics.track("page_exit", buildExitPayload());
+      analytics.flush(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -173,7 +179,7 @@ export default function DailyEntryForm() {
 
     if (progress >= last + 10) {
       lastTrackedProgressRef.current = progress;
-      analytics?.track?.("progress_snapshot", {
+      analytics.track("progress_snapshot", {
         progressPercent: progress,
         dogId: dogSelected ? dogId : null,
         selectedDate,
@@ -258,7 +264,7 @@ export default function DailyEntryForm() {
      CALENDAR NAVIGATION (with analytics)
   ========================= */
   const handlePreviousMonth = () => {
-    analytics?.track?.("calendar_month_changed", {
+    analytics.track("calendar_month_changed", {
       direction: "prev",
       year: currentMonth.getFullYear(),
       month: currentMonth.getMonth() + 1,
@@ -270,7 +276,7 @@ export default function DailyEntryForm() {
   };
 
   const handleNextMonth = () => {
-    analytics?.track?.("calendar_month_changed", {
+    analytics.track("calendar_month_changed", {
       direction: "next",
       year: currentMonth.getFullYear(),
       month: currentMonth.getMonth() + 1,
@@ -288,7 +294,7 @@ export default function DailyEntryForm() {
     const status = getDateStatus(day);
     const hasEntry = hasEntryOnDate(day);
 
-    analytics?.track?.("calendar_day_clicked", {
+    analytics.track("calendar_day_clicked", {
       day,
       status,
       hasEntry,
@@ -308,7 +314,7 @@ export default function DailyEntryForm() {
     setDogSelected(!!selectedDogId);
 
     if (selectedDogId) {
-      analytics?.track?.("dog_selected", {
+      analytics.track("dog_selected", {
         dogId: selectedDogId,
         source,
         timeSinceLoadMs: Date.now() - startTimeRef.current,
@@ -324,7 +330,6 @@ export default function DailyEntryForm() {
     const n = Number(raw);
     if (!raw || raw === "" || Number.isNaN(n)) return "empty";
 
-    // Field-specific buckets (simple & useful)
     if (fieldName === "water") {
       if (n <= 0) return "0";
       if (n <= 100) return "1-100";
@@ -364,14 +369,12 @@ export default function DailyEntryForm() {
       return "9+";
     }
 
-    // Default fallback
     if (n <= 0) return "0";
     if (n <= 10) return "1-10";
     return "10+";
   };
 
   const trackFieldChanged = (fieldName, rawValue, type = "number", debounceMs = 500) => {
-    // Debounce per field
     const prevTimer = fieldDebounceTimersRef.current.get(fieldName);
     if (prevTimer) clearTimeout(prevTimer);
 
@@ -392,7 +395,7 @@ export default function DailyEntryForm() {
         fieldBucketRef.current.set(fieldName, bucket);
         changedFieldsRef.current.add(fieldName);
 
-        analytics?.track?.("field_changed", {
+        analytics.track("field_changed", {
           fieldName,
           bucket,
           dogId: dogSelected ? dogId : null,
@@ -429,7 +432,7 @@ export default function DailyEntryForm() {
       const nextCount = prevCount + 1;
       hoverCountsRef.current.set(hoverKey, nextCount);
 
-      analytics?.track?.("option_hover_duration", {
+      analytics.track("option_hover_duration", {
         groupLabel,
         option,
         durationMs,
@@ -458,8 +461,7 @@ export default function DailyEntryForm() {
                 const previousOption = selectedValue;
                 setter(opt);
 
-                // option_selected
-                analytics?.track?.("option_selected", {
+                analytics.track("option_selected", {
                   groupLabel,
                   option: opt,
                   previousOption: previousOption || null,
@@ -468,7 +470,6 @@ export default function DailyEntryForm() {
                   selectedDate,
                 });
 
-                // count changes per group
                 const prev = optionChangeCountsRef.current.get(groupLabel) || 0;
                 optionChangeCountsRef.current.set(groupLabel, prev + 1);
               }}
@@ -482,6 +483,33 @@ export default function DailyEntryForm() {
         </div>
       </div>
     );
+  };
+
+  /* =========================
+     LOGOUT (end session + stop analytics)
+  ========================= */
+  const handleLogout = async () => {
+    try {
+      const sid = localStorage.getItem("sessionId");
+      if (sid) {
+        await fetch(`/api/sessions/${sid}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+      }
+    } catch (err) {
+      // best effort
+      console.warn("Logout session end failed:", err);
+    }
+
+    try {
+      analytics.track("logout_clicked", { route: "/daily-entry" });
+      analytics.flush(true);
+      analytics.stop();
+    } catch (_) {}
+
+    localStorage.clear();
+    navigate("/login");
   };
 
   /* =========================
@@ -514,7 +542,7 @@ export default function DailyEntryForm() {
 
     const emptyFields = fields.filter((v) => !v || v === 0).length;
 
-    analytics?.track?.("submit_attempt", {
+    analytics.track("submit_attempt", {
       progressPercent: calculateProgress(),
       emptyFields,
       timeOnPageMs: Date.now() - startTimeRef.current,
@@ -554,13 +582,13 @@ export default function DailyEntryForm() {
       emptyFields,
     };
 
-    console.log('🔍 Submitting entry:', { userId, dogId, entry });
     setLoading(true);
     try {
       const response = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry),
+        credentials: "include",
       });
 
       const requestDurationMs = Date.now() - submitStart;
@@ -574,7 +602,7 @@ export default function DailyEntryForm() {
           // ignore
         }
 
-        analytics?.track?.("submit_fail", {
+        analytics.track("submit_fail", {
           requestDurationMs,
           statusCode: response.status,
           errorMessageTrimmed: String(msg).substring(0, 100),
@@ -585,7 +613,7 @@ export default function DailyEntryForm() {
         throw new Error(msg);
       }
 
-      analytics?.track?.("submit_success", {
+      analytics.track("submit_success", {
         requestDurationMs,
         dogId,
         selectedDate,
@@ -614,7 +642,7 @@ export default function DailyEntryForm() {
       setOwnerConcern("");
 
       // Refresh entries
-      const entriesResponse = await fetch(`/api/entries?userId=${userId}`);
+      const entriesResponse = await fetch(`/api/entries?userId=${userId}`, { credentials: "include" });
       const entriesData = await entriesResponse.json();
       setEntries(entriesData);
     } catch (err) {
@@ -650,13 +678,7 @@ export default function DailyEntryForm() {
         <button onClick={() => navigate("/notifications")} className="nav-btn">
           🔔 Meldingen
         </button>
-        <button
-          onClick={() => {
-            localStorage.clear();
-            navigate("/login");
-          }}
-          className="nav-btn logout-button"
-        >
+        <button onClick={handleLogout} className="nav-btn logout-button">
           🚪 Uitloggen
         </button>
       </nav>
