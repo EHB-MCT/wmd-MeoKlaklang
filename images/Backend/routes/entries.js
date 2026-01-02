@@ -5,9 +5,11 @@ const { getDB } = require("../db");
 const router = express.Router();
 
 /* ===========================
-   POST: nieuwe dagelijkse entry
+    POST: nieuwe dagelijkse entry
 =========================== */
 router.post("/", async (req, res) => {
+  console.log('📝 Entries POST route called');
+  console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
   const db = getDB();
 
   const {
@@ -53,6 +55,60 @@ router.post("/", async (req, res) => {
     });
   }
 
+  // Required fields validation
+  const requiredFields = ['food', 'poop', 'behavior', 'emotion'];
+  const missingRequired = requiredFields.filter(field => {
+    const value = req.body[field];
+    return !value || value === '';
+  });
+  if (missingRequired.length > 0) {
+    return res.status(400).json({
+      error: `Verplichte velden missen: ${missingRequired.join(', ')}`,
+      missingFields
+    });
+  }
+
+  /* ===== Validatie en cleaning ===== */
+  // Helper to safely convert to number and validate
+  const safeNumber = (value, fieldName) => {
+    const num = Number(value);
+    if (isNaN(num)) {
+      return null; // Will be handled as missing/invalid
+    }
+    return num;
+  };
+
+  // Clean and convert numeric inputs
+  let waterNum = safeNumber(water, 'water');
+  let sleepHoursNum = safeNumber(sleepHours, 'sleepHours');
+  let walksNum = safeNumber(walks, 'walks');
+  let playtimeMinutesNum = safeNumber(playtimeMinutes, 'playtimeMinutes');
+  let aloneHoursNum = safeNumber(aloneHours, 'aloneHours');
+
+  // Reject if conversion failed for required fields
+  if (waterNum === null && water !== null && water !== undefined && water !== '') {
+    return res.status(400).json({ error: "Water moet een geldig getal zijn" });
+  }
+
+  // Numeric validation and clamping
+  waterNum = waterNum !== null ? Math.max(0, waterNum) : null;
+  sleepHoursNum = sleepHoursNum !== null ? Math.min(24, Math.max(0, sleepHoursNum)) : null;
+  walksNum = walksNum !== null ? Math.max(0, walksNum) : null;
+  playtimeMinutesNum = playtimeMinutesNum !== null ? Math.min(480, Math.max(0, playtimeMinutesNum)) : null;
+  aloneHoursNum = aloneHoursNum !== null ? Math.min(24, Math.max(0, aloneHoursNum)) : null;
+  if (sleepHoursNum < 0 || sleepHoursNum > 24) {
+    return res.status(400).json({ error: "Slaapuren moet tussen 0-24 uur liggen" });
+  }
+  if (walksNum < 0 || walksNum > 20) {
+    return res.status(400).json({ error: "Aantal wandelingen moet tussen 0-20 liggen" });
+  }
+  if (playtimeMinutesNum < 0 || playtimeMinutesNum > 480) { // Max 8 hours
+    return res.status(400).json({ error: "Speeltijd moet tussen 0-480 minuten liggen" });
+  }
+  if (aloneHoursNum < 0 || aloneHoursNum > 24) {
+    return res.status(400).json({ error: "Alleen thuis uren moet tussen 0-24 liggen" });
+  }
+
   const newEntry = {
     userId: new ObjectId(userId),
     dogId: new ObjectId(dogId),
@@ -61,11 +117,11 @@ router.post("/", async (req, res) => {
 
     /* ===== Zorgdata ===== */
     food: food || null,
-    water: Number(water) || 0,
-    sleepHours: Number(sleepHours) || 0,
-    walks: Number(walks) || 0,
-    playtimeMinutes: Number(playtimeMinutes) || 0,
-    aloneHours: Number(aloneHours) || 0,
+    water: waterNum,
+    sleepHours: sleepHoursNum,
+    walks: walksNum,
+    playtimeMinutes: playtimeMinutesNum,
+    aloneHours: aloneHoursNum,
 
     /* ===== Gezondheid ===== */
     poop: poop || null,
@@ -86,8 +142,11 @@ router.post("/", async (req, res) => {
 
     /* ===== Weapon data ===== */
     hoveredOptions: Array.isArray(hoveredOptions) ? hoveredOptions : [],
-    timeOnPage: Number(timeOnPage) || 0,
-    emptyFields: Number(emptyFields) || 0,
+    timeOnPage: Math.max(0, Number(timeOnPage) || 0),
+    // Recompute emptyFields on backend
+    emptyFields: ['food', 'poop', 'behavior', 'emotion'].filter(field => 
+      !req.body[field] || req.body[field] === ''
+    ).length,
 
     createdAt: new Date(),
   };

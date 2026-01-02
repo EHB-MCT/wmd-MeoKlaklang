@@ -49,7 +49,19 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  res.json({ _id: user._id, name: user.name, role: user.role });
+  // Create session for the user
+  const sessionId = require('crypto').randomBytes(16).toString('hex');
+  const { createSession } = require('../models/Session');
+  await createSession(user._id.toString(), sessionId, req.ip, req.get('User-Agent'));
+  
+  // Set session cookie
+  res.cookie('sessionId', sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  });
+
+  res.json({ _id: user._id, name: user.name, role: user.role, sessionId });
 });
 
 module.exports = router;

@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DailyEntryForm.css";
+import analytics from "../utils/analytics";
 
 export default function DailyEntryForm() {
   const navigate = useNavigate();
-  
+
   /* =========================
      BASIS
   ========================= */
@@ -17,133 +18,19 @@ export default function DailyEntryForm() {
   const [loading, setLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const [startTime] = useState(Date.now());
+  const pageStartTsRef = useRef(Date.now());
+  const startTimeRef = useRef(Date.now());
+
   const [hoveredOptions, setHoveredOptions] = useState([]);
+  const hoverStartTimesRef = useRef(new Map()); // key -> ts
+  const hoverCountsRef = useRef(new Map()); // key -> count
+  const optionChangeCountsRef = useRef(new Map()); // groupLabel -> count
 
-  /* =========================
-     DOG SELECTION HANDLER
-  ========================= */
-  const handleDogSelection = (e) => {
-    const selectedDogId = e.target.value;
-    setDogId(selectedDogId);
-    setDogSelected(!!selectedDogId);
-  };
+  const changedFieldsRef = useRef(new Set()); // field names (bucket changes)
+  const fieldBucketRef = useRef(new Map()); // fieldName -> lastBucket
+  const fieldDebounceTimersRef = useRef(new Map()); // fieldName -> timerId
 
-  /* =========================
-     PROGRESS CALCULATION
-  ========================= */
-  const calculateProgress = () => {
-    const requiredFields = [food, poop, behavior, emotion];
-    const optionalFields = [water, sleepHours, walks, playtimeMinutes, aloneHours];
-    const checkboxFields = [vomit, meds, stressSignals, painSignals, trainingDone, leftAloneTooLong];
-    
-    const requiredFilled = requiredFields.filter(field => field && field !== "").length;
-    const optionalFilled = optionalFields.filter(field => field && field !== "").length;
-    const checkboxesFilled = checkboxFields.filter(Boolean).length;
-    
-    const totalFields = requiredFields.length + optionalFields.length + checkboxFields.length;
-    const filledFields = requiredFilled + optionalFilled + checkboxesFilled;
-    
-    return Math.round((filledFields / totalFields) * 100);
-  };
-
-  const getCompletionStatus = () => {
-    const progress = calculateProgress();
-    if (progress === 100) return { text: "Volledig ingevuld", color: "#48bb78" };
-    if (progress >= 75) return { text: "Bijna klaar", color: "#4299e1" };
-    if (progress >= 50) return { text: "Goed bezig", color: "#ed8936" };
-    return { text: "Net begonnen", color: "#718096" };
-  };
-
-  /* =========================
-     ENTRIES OPHALEN
-  ========================= */
-  useEffect(() => {
-    if (!userId) return;
-
-    fetch(`/api/entries?userId=${userId}`)
-      .then((res) => res.json())
-      .then((data) => setEntries(data))
-      .catch((err) => console.error("Error fetching entries:", err));
-  }, [userId]);
-
-  /* =========================
-     CALENDAR FUNCTIONS
-  ========================= */
-  const getDaysInMonth = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    // Adjust for Monday-first week (getDay() returns 0 for Sunday, but we want Monday first)
-    const firstDay = new Date(year, month, 1).getDay() === 0 ? 6 : new Date(year, month, 1).getDay() - 1;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    const days = [];
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-    return days;
-  };
-
-  const getDogEntryCount = (dogId) => {
-    return entries.filter(entry => entry.dogId === dogId).length;
-  };
-
-  /* =========================
-     CALENDAR NAVIGATION
-  ========================= */
-  const handlePreviousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
-  };
-
-  const handleDateClick = (day) => {
-    if (!day) return;
-    
-    const newSelectedDate = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    setSelectedDate(newSelectedDate);
-  };
-
-  const hasEntryOnDate = (day, checkMonth = currentMonth, checkYear = currentMonth.getFullYear()) => {
-    const dateStr = `${checkYear}-${String(checkMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return entries.some(entry => 
-      entry.dogId === dogId && entry.date === dateStr
-    );
-  };
-
-  const isToday = (day) => {
-    const today = new Date();
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const todayStr = today.toISOString().split('T')[0];
-    return dateStr === todayStr;
-  };
-
-  const isPastDateFromToday = (date) => {
-    const checkDate = new Date(date + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return checkDate < today;
-  };
-
-  const isPastDate = (day) => {
-    const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    checkDate.setHours(0, 0, 0, 0);
-    return checkDate <= today;
-  };
-
-  const getDateStatus = (day) => {
-    if (!day) return 'disabled';
-    if (isToday(day)) return 'today';
-    if (!isPastDate(day)) return 'future';
-    return 'past';
-  };
+  const lastTrackedProgressRef = useRef(0);
 
   /* =========================
      DAGELIJKSE DATA
@@ -172,9 +59,47 @@ export default function DailyEntryForm() {
   const [leftAloneTooLong, setLeftAloneTooLong] = useState(false);
 
   /* =========================
-     SUBJECTIEVE ZORG (WEAPON)
+     SUBJECTIEVE ZORG
   ========================= */
   const [ownerConcern, setOwnerConcern] = useState("");
+
+  /* =========================
+     PROGRESS CALCULATION
+  ========================= */
+  const calculateProgress = () => {
+    const requiredFields = [food, poop, behavior, emotion];
+    const optionalFields = [water, sleepHours, walks, playtimeMinutes, aloneHours];
+    const checkboxFields = [vomit, meds, stressSignals, painSignals, trainingDone, leftAloneTooLong];
+
+    const requiredFilled = requiredFields.filter((field) => field && field !== "").length;
+    const optionalFilled = optionalFields.filter((field) => field && field !== "").length;
+    const checkboxesFilled = checkboxFields.filter(Boolean).length;
+
+    const totalFields = requiredFields.length + optionalFields.length + checkboxFields.length;
+    const filledFields = requiredFilled + optionalFilled + checkboxesFilled;
+
+    return Math.round((filledFields / totalFields) * 100);
+  };
+
+  const getCompletionStatus = () => {
+    const progress = calculateProgress();
+    if (progress === 100) return { text: "Volledig ingevuld", color: "#48bb78" };
+    if (progress >= 75) return { text: "Bijna klaar", color: "#4299e1" };
+    if (progress >= 50) return { text: "Goed bezig", color: "#ed8936" };
+    return { text: "Net begonnen", color: "#718096" };
+  };
+
+  /* =========================
+     ENTRIES OPHALEN
+  ========================= */
+  useEffect(() => {
+    if (!userId) return;
+
+    fetch(`/api/entries?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => setEntries(data))
+      .catch((err) => console.error("Error fetching entries:", err));
+  }, [userId]);
 
   /* =========================
      DOGS OPHALEN
@@ -189,35 +114,375 @@ export default function DailyEntryForm() {
   }, [userId]);
 
   /* =========================
-     HOVER TRACKING
+     PAGE VIEW / EXIT
   ========================= */
-  const handleHover = (value) => {
-    if (!hoveredOptions.includes(value)) {
-      setHoveredOptions((prev) => [...prev, value]);
+  useEffect(() => {
+    analytics?.track?.("page_view", {
+      page: "daily-entry",
+      selectedDate,
+      dogSelected: false,
+      dogId: null,
+    });
+
+    const buildExitPayload = () => {
+      const timeOnPageMs = Date.now() - pageStartTsRef.current;
+      const progressPercent = calculateProgress();
+
+      // optionChangeCounts -> plain object
+      const optionChangeCounts = {};
+      optionChangeCountsRef.current.forEach((v, k) => {
+        optionChangeCounts[k] = v;
+      });
+
+      return {
+        page: "daily-entry",
+        timeOnPageMs,
+        progressPercent,
+        dogSelected,
+        dogId: dogSelected ? dogId : null,
+        selectedDate,
+        changedFieldsCount: changedFieldsRef.current.size,
+        optionChangeCounts,
+        hoveredOptionsCount: hoveredOptions.length,
+      };
+    };
+
+    const onBeforeUnload = () => {
+      // We try to flush via analytics util if it supports it
+      analytics?.track?.("page_exit", buildExitPayload());
+      analytics?.flush?.({ beacon: true });
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      analytics?.track?.("page_exit", buildExitPayload());
+      analytics?.flush?.({ beacon: false });
+      analytics?.destroy?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* =========================
+     PROGRESS SNAPSHOTS (>=10% increase)
+  ========================= */
+  useEffect(() => {
+    const progress = calculateProgress();
+    const last = lastTrackedProgressRef.current;
+
+    if (progress >= last + 10) {
+      lastTrackedProgressRef.current = progress;
+      analytics?.track?.("progress_snapshot", {
+        progressPercent: progress,
+        dogId: dogSelected ? dogId : null,
+        selectedDate,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    food,
+    water,
+    sleepHours,
+    walks,
+    playtimeMinutes,
+    aloneHours,
+    poop,
+    behavior,
+    emotion,
+    appetite,
+    energyLevel,
+    vomit,
+    meds,
+    stressSignals,
+    painSignals,
+    trainingDone,
+    leftAloneTooLong,
+    ownerConcern,
+  ]);
+
+  /* =========================
+     CALENDAR FUNCTIONS
+  ========================= */
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay =
+      new Date(year, month, 1).getDay() === 0
+        ? 6
+        : new Date(year, month, 1).getDay() - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  const getDogEntryCount = (dId) => entries.filter((entry) => entry.dogId === dId).length;
+
+  const hasEntryOnDate = (day, checkMonth = currentMonth, checkYear = currentMonth.getFullYear()) => {
+    const dateStr = `${checkYear}-${String(checkMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return entries.some((entry) => entry.dogId === dogId && entry.date === dateStr);
+  };
+
+  const isToday = (day) => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return dateStr === todayStr;
+  };
+
+  const isPastDateFromToday = (date) => {
+    const checkDate = new Date(date + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return checkDate < today;
+  };
+
+  const isPastDate = (day) => {
+    const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate <= today;
+  };
+
+  const getDateStatus = (day) => {
+    if (!day) return "disabled";
+    if (isToday(day)) return "today";
+    if (!isPastDate(day)) return "future";
+    return "past";
+  };
+
+  /* =========================
+     CALENDAR NAVIGATION (with analytics)
+  ========================= */
+  const handlePreviousMonth = () => {
+    analytics?.track?.("calendar_month_changed", {
+      direction: "prev",
+      year: currentMonth.getFullYear(),
+      month: currentMonth.getMonth() + 1,
+      dogId: dogSelected ? dogId : null,
+      selectedDate,
+    });
+
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  };
+
+  const handleNextMonth = () => {
+    analytics?.track?.("calendar_month_changed", {
+      direction: "next",
+      year: currentMonth.getFullYear(),
+      month: currentMonth.getMonth() + 1,
+      dogId: dogSelected ? dogId : null,
+      selectedDate,
+    });
+
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+  };
+
+  const handleDateClick = (day) => {
+    if (!day) return;
+
+    const newSelectedDate = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const status = getDateStatus(day);
+    const hasEntry = hasEntryOnDate(day);
+
+    analytics?.track?.("calendar_day_clicked", {
+      day,
+      status,
+      hasEntry,
+      newSelectedDate,
+      dogId: dogSelected ? dogId : null,
+      selectedDate,
+    });
+
+    setSelectedDate(newSelectedDate);
+  };
+
+  /* =========================
+     DOG SELECT (sidebar)
+  ========================= */
+  const selectDog = (selectedDogId, source = "unknown") => {
+    setDogId(selectedDogId);
+    setDogSelected(!!selectedDogId);
+
+    if (selectedDogId) {
+      analytics?.track?.("dog_selected", {
+        dogId: selectedDogId,
+        source,
+        timeSinceLoadMs: Date.now() - startTimeRef.current,
+        selectedDate,
+      });
     }
   };
 
   /* =========================
-     OPTION BUTTONS
+     PRIVACY-SAFE FIELD BUCKETS
   ========================= */
-  const renderOptionButtons = (label, options, selectedValue, setter) => (
-    <div>
-      <strong>{label}</strong>
-      <div className="option-buttons">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => setter(opt)}
-            onMouseEnter={() => handleHover(opt)}
-            className={`option-button ${selectedValue === opt ? "active" : ""}`}
-          >
-            {opt}
-          </button>
-        ))}
+  const bucketNumber = (fieldName, raw) => {
+    const n = Number(raw);
+    if (!raw || raw === "" || Number.isNaN(n)) return "empty";
+
+    // Field-specific buckets (simple & useful)
+    if (fieldName === "water") {
+      if (n <= 0) return "0";
+      if (n <= 100) return "1-100";
+      if (n <= 300) return "101-300";
+      if (n <= 700) return "301-700";
+      return "700+";
+    }
+
+    if (fieldName === "sleepHours") {
+      if (n <= 0) return "0";
+      if (n <= 3) return "1-3";
+      if (n <= 6) return "4-6";
+      if (n <= 9) return "7-9";
+      return "10+";
+    }
+
+    if (fieldName === "walks") {
+      if (n <= 0) return "0";
+      if (n === 1) return "1";
+      if (n === 2) return "2";
+      return "3+";
+    }
+
+    if (fieldName === "playtimeMinutes") {
+      if (n <= 0) return "0";
+      if (n <= 15) return "1-15";
+      if (n <= 30) return "16-30";
+      if (n <= 60) return "31-60";
+      return "60+";
+    }
+
+    if (fieldName === "aloneHours") {
+      if (n <= 0) return "0";
+      if (n <= 2) return "1-2";
+      if (n <= 5) return "3-5";
+      if (n <= 8) return "6-8";
+      return "9+";
+    }
+
+    // Default fallback
+    if (n <= 0) return "0";
+    if (n <= 10) return "1-10";
+    return "10+";
+  };
+
+  const trackFieldChanged = (fieldName, rawValue, type = "number", debounceMs = 500) => {
+    // Debounce per field
+    const prevTimer = fieldDebounceTimersRef.current.get(fieldName);
+    if (prevTimer) clearTimeout(prevTimer);
+
+    const timer = setTimeout(() => {
+      let bucket = "unknown";
+      if (type === "number") bucket = bucketNumber(fieldName, rawValue);
+      if (type === "boolean") bucket = rawValue ? "true" : "false";
+      if (type === "text") {
+        const len = (rawValue || "").length;
+        if (len === 0) bucket = "0";
+        else if (len <= 3) bucket = "1-3";
+        else if (len <= 10) bucket = "4-10";
+        else bucket = "11+";
+      }
+
+      const lastBucket = fieldBucketRef.current.get(fieldName);
+      if (bucket !== lastBucket) {
+        fieldBucketRef.current.set(fieldName, bucket);
+        changedFieldsRef.current.add(fieldName);
+
+        analytics?.track?.("field_changed", {
+          fieldName,
+          bucket,
+          dogId: dogSelected ? dogId : null,
+          selectedDate,
+        });
+      }
+    }, debounceMs);
+
+    fieldDebounceTimersRef.current.set(fieldName, timer);
+  };
+
+  /* =========================
+     HOVER TRACKING (option buttons only)
+  ========================= */
+  const handleOptionHover = (groupLabel, option, isEntering) => {
+    const hoverKey = `${groupLabel}_${option}`;
+
+    if (isEntering) {
+      hoverStartTimesRef.current.set(hoverKey, Date.now());
+      if (!hoveredOptions.includes(hoverKey)) {
+        setHoveredOptions((prev) => [...prev, hoverKey]);
+      }
+      return;
+    }
+
+    const start = hoverStartTimesRef.current.get(hoverKey);
+    if (!start) return;
+
+    const durationMs = Date.now() - start;
+    hoverStartTimesRef.current.delete(hoverKey);
+
+    if (durationMs >= 150) {
+      const prevCount = hoverCountsRef.current.get(hoverKey) || 0;
+      const nextCount = prevCount + 1;
+      hoverCountsRef.current.set(hoverKey, nextCount);
+
+      analytics?.track?.("option_hover_duration", {
+        groupLabel,
+        option,
+        durationMs,
+        hoverCount: nextCount,
+        dogId: dogSelected ? dogId : null,
+        selectedDate,
+      });
+    }
+  };
+
+  /* =========================
+     OPTION BUTTONS (with option_selected)
+  ========================= */
+  const renderOptionButtons = (label, options, selectedValue, setter) => {
+    const groupLabel = label.toLowerCase().replace(/\s+/g, "_");
+
+    return (
+      <div>
+        <strong>{label}</strong>
+        <div className="option-buttons">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => {
+                const previousOption = selectedValue;
+                setter(opt);
+
+                // option_selected
+                analytics?.track?.("option_selected", {
+                  groupLabel,
+                  option: opt,
+                  previousOption: previousOption || null,
+                  timeSinceLoadMs: Date.now() - startTimeRef.current,
+                  dogId: dogSelected ? dogId : null,
+                  selectedDate,
+                });
+
+                // count changes per group
+                const prev = optionChangeCountsRef.current.get(groupLabel) || 0;
+                optionChangeCountsRef.current.set(groupLabel, prev + 1);
+              }}
+              onMouseEnter={() => handleOptionHover(groupLabel, opt, true)}
+              onMouseLeave={() => handleOptionHover(groupLabel, opt, false)}
+              className={`option-button ${selectedValue === opt ? "active" : ""}`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   /* =========================
      SUBMIT
@@ -230,7 +495,7 @@ export default function DailyEntryForm() {
       return;
     }
 
-    const timeOnPage = Date.now() - startTime;
+    const submitStart = Date.now();
 
     const fields = [
       food,
@@ -248,6 +513,14 @@ export default function DailyEntryForm() {
     ];
 
     const emptyFields = fields.filter((v) => !v || v === 0).length;
+
+    analytics?.track?.("submit_attempt", {
+      progressPercent: calculateProgress(),
+      emptyFields,
+      timeOnPageMs: Date.now() - startTimeRef.current,
+      dogId,
+      selectedDate,
+    });
 
     const entry = {
       userId,
@@ -277,10 +550,11 @@ export default function DailyEntryForm() {
       ownerConcern,
 
       hoveredOptions,
-      timeOnPage,
+      timeOnPage: Date.now() - startTimeRef.current,
       emptyFields,
     };
 
+    console.log('🔍 Submitting entry:', { userId, dogId, entry });
     setLoading(true);
     try {
       const response = await fetch("/api/entries", {
@@ -289,14 +563,37 @@ export default function DailyEntryForm() {
         body: JSON.stringify(entry),
       });
 
+      const requestDurationMs = Date.now() - submitStart;
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Fout bij opslaan");
+        let msg = "Fout bij opslaan";
+        try {
+          const errorData = await response.json();
+          msg = errorData.error || msg;
+        } catch {
+          // ignore
+        }
+
+        analytics?.track?.("submit_fail", {
+          requestDurationMs,
+          statusCode: response.status,
+          errorMessageTrimmed: String(msg).substring(0, 100),
+          dogId,
+          selectedDate,
+        });
+
+        throw new Error(msg);
       }
 
+      analytics?.track?.("submit_success", {
+        requestDurationMs,
+        dogId,
+        selectedDate,
+      });
+
       alert("Dagelijkse log opgeslagen 🐾");
-      
-      // Reset form fields
+
+      // Reset fields
       setFood("");
       setWater("");
       setSleepHours("");
@@ -315,12 +612,11 @@ export default function DailyEntryForm() {
       setTrainingDone(false);
       setLeftAloneTooLong(false);
       setOwnerConcern("");
-      
-      // Refresh entries to update calendar and stats
+
+      // Refresh entries
       const entriesResponse = await fetch(`/api/entries?userId=${userId}`);
       const entriesData = await entriesResponse.json();
       setEntries(entriesData);
-      
     } catch (err) {
       console.error(err);
       alert(`Fout bij opslaan: ${err.message}`);
@@ -342,20 +638,32 @@ export default function DailyEntryForm() {
 
       {/* NAVIGATIE */}
       <nav className="nav-bar">
-        <button onClick={() => navigate("/daily-entry")} className="nav-btn active">📓 Logboek</button>
-        <button onClick={() => navigate("/my-dogs")} className="nav-btn">🐕 Mijn dieren</button>
-        <button onClick={() => navigate("/profile")} className="nav-btn">👤 Profiel</button>
-        <button onClick={() => navigate("/notifications")} className="nav-btn">🔔 Meldingen</button>
-        <button onClick={() => {
-          localStorage.clear();
-          navigate("/login");
-        }} className="nav-btn logout-button">🚪 Uitloggen</button>
+        <button onClick={() => navigate("/daily-entry")} className="nav-btn active">
+          📓 Logboek
+        </button>
+        <button onClick={() => navigate("/my-dogs")} className="nav-btn">
+          🐕 Mijn dieren
+        </button>
+        <button onClick={() => navigate("/profile")} className="nav-btn">
+          👤 Profiel
+        </button>
+        <button onClick={() => navigate("/notifications")} className="nav-btn">
+          🔔 Meldingen
+        </button>
+        <button
+          onClick={() => {
+            localStorage.clear();
+            navigate("/login");
+          }}
+          className="nav-btn logout-button"
+        >
+          🚪 Uitloggen
+        </button>
       </nav>
 
       <div className="main-content">
-        {/* LINKER KOLOM - OVERZICHT */}
+        {/* LINKER KOLOM */}
         <div className="sidebar">
-          {/* DOG OVERVIEW CARDS */}
           <div className="dog-overview-section">
             <h3>🐕 Mijn Honden</h3>
             {dogs.length === 0 ? (
@@ -370,31 +678,23 @@ export default function DailyEntryForm() {
                 {dogs.map((dog) => {
                   const entryCount = getDogEntryCount(dog._id);
                   const isSelected = dog._id === dogId;
+
                   return (
-                    <div 
-                      key={dog._id} 
-                      className={`dog-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => {
-                        setDogId(dog._id);
-                        setDogSelected(true);
-                      }}
+                    <div
+                      key={dog._id}
+                      className={`dog-card ${isSelected ? "selected" : ""}`}
+                      onClick={() => selectDog(dog._id, "sidebar_card")}
                     >
-                      <div className="dog-avatar">
-                        🐕
-                      </div>
+                      <div className="dog-avatar">🐕</div>
                       <div className="dog-info">
                         <h4>{dog.name}</h4>
                         <p>{dog.breed}</p>
                         <div className="dog-stats">
-                          <span className="stat">
-                            📊 {entryCount} entries
-                          </span>
+                          <span className="stat">📊 {entryCount} entries</span>
                           {dog.age && <span className="stat">🎂 {dog.age} jaar</span>}
                         </div>
                       </div>
-                      <div className="dog-select-indicator">
-                        {isSelected ? '✅' : '○'}
-                      </div>
+                      <div className="dog-select-indicator">{isSelected ? "✅" : "○"}</div>
                     </div>
                   );
                 })}
@@ -402,10 +702,11 @@ export default function DailyEntryForm() {
             )}
           </div>
 
-          {/* RECENT ENTRIES & STATS */}
+          {/* RECENT ENTRIES & CALENDAR */}
           {dogSelected && (
             <div className="recent-entries-section">
-              <h3>📊 Recent voor {dogs.find(d => d._id === dogId)?.name}</h3>
+              <h3>📊 Recent voor {dogs.find((d) => d._id === dogId)?.name}</h3>
+
               <div className="stats-grid">
                 <div className="stat-card">
                   <div className="stat-number">{getDogEntryCount(dogId)}</div>
@@ -413,46 +714,65 @@ export default function DailyEntryForm() {
                 </div>
                 <div className="stat-card">
                   <div className="stat-number">
-                    {entries.filter(e => e.dogId === dogId && e.date === new Date().toISOString().split('T')[0]).length}
+                    {
+                      entries.filter(
+                        (e) => e.dogId === dogId && e.date === new Date().toISOString().split("T")[0]
+                      ).length
+                    }
                   </div>
                   <div className="stat-label">Vandaag</div>
                 </div>
               </div>
-              
-              {/* ENHANCED CALENDAR */}
+
               <div className="calendar-section">
                 <div className="calendar-nav">
-                  <button onClick={handlePreviousMonth} className="calendar-nav-btn">‹</button>
-                  <h4>📅 {currentMonth.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}</h4>
-                  <button onClick={handleNextMonth} className="calendar-nav-btn">›</button>
+                  <button onClick={handlePreviousMonth} className="calendar-nav-btn">
+                    ‹
+                  </button>
+                  <h4>
+                    📅{" "}
+                    {currentMonth.toLocaleDateString("nl-NL", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </h4>
+                  <button onClick={handleNextMonth} className="calendar-nav-btn">
+                    ›
+                  </button>
                 </div>
+
                 <div className="mini-calendar">
                   <div className="calendar-header">
-                    {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map(day => (
-                      <div key={day} className="calendar-day-header">{day}</div>
+                    {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map((day) => (
+                      <div key={day} className="calendar-day-header">
+                        {day}
+                      </div>
                     ))}
                   </div>
+
                   <div className="calendar-grid">
                     {getDaysInMonth(currentMonth).map((day, index) => {
-                      const isSelected = day === parseInt(selectedDate.split('-')[2]) && 
-                                     currentMonth.getMonth() === new Date(selectedDate).getMonth() &&
-                                     currentMonth.getFullYear() === new Date(selectedDate).getFullYear();
+                      const isSelected =
+                        day === parseInt(selectedDate.split("-")[2], 10) &&
+                        currentMonth.getMonth() === new Date(selectedDate).getMonth() &&
+                        currentMonth.getFullYear() === new Date(selectedDate).getFullYear();
+
                       const hasEntry = day ? hasEntryOnDate(day) : false;
                       const today = day ? isToday(day) : false;
-                      const status = day ? getDateStatus(day) : 'disabled';
+                      const status = day ? getDateStatus(day) : "disabled";
                       const isClickable = day && isPastDate(day);
-                      
+
                       return (
-                        <div 
-                          key={index} 
-                          className={`calendar-day 
-                            ${isSelected ? 'selected' : ''} 
-                            ${today ? 'today' : ''} 
-                            ${hasEntry ? 'has-entry' : ''} 
-                            ${status === 'future' ? 'future' : ''}
-                            ${isClickable ? 'clickable' : 'disabled'}`}
+                        <div
+                          key={index}
+                          className={`calendar-day
+                            ${isSelected ? "selected" : ""}
+                            ${today ? "today" : ""}
+                            ${hasEntry ? "has-entry" : ""}
+                            ${status === "future" ? "future" : ""}
+                            ${isClickable ? "clickable" : "disabled"}`}
                           onClick={() => isClickable && handleDateClick(day)}
-                          title={status === 'future' ? 'Toekomstige data niet beschikbaar' : ''}
+                          title={status === "future" ? "Toekomstige data niet beschikbaar" : ""}
                         >
                           {day}
                           {hasEntry && <span className="entry-dot"></span>}
@@ -462,6 +782,7 @@ export default function DailyEntryForm() {
                     })}
                   </div>
                 </div>
+
                 <div className="calendar-legend">
                   <div className="legend-item">
                     <span className="legend-dot selected-dot"></span>
@@ -481,7 +802,7 @@ export default function DailyEntryForm() {
           )}
         </div>
 
-        {/* RECHTER KOLOM - FORM */}
+        {/* RECHTER KOLOM */}
         <div className="form-section">
           {!dogSelected ? (
             <div className="select-dog-prompt">
@@ -491,18 +812,18 @@ export default function DailyEntryForm() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="enhanced-form">
-              {/* PROGRESS INDICATOR */}
+              {/* PROGRESS */}
               <div className="progress-section">
                 <div className="progress-header">
                   <h4>Voortgang</h4>
                   <span className="progress-percentage">{calculateProgress()}%</span>
                 </div>
                 <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ 
+                  <div
+                    className="progress-fill"
+                    style={{
                       width: `${calculateProgress()}%`,
-                      backgroundColor: getCompletionStatus().color 
+                      backgroundColor: getCompletionStatus().color,
                     }}
                   ></div>
                 </div>
@@ -513,120 +834,214 @@ export default function DailyEntryForm() {
 
               <div className="form-header-info">
                 <div className="form-title">
-                  <h3>📋 Invoeren voor {dogs.find(d => d._id === dogId)?.name}</h3>
+                  <h3>📋 Invoeren voor {dogs.find((d) => d._id === dogId)?.name}</h3>
                   <div className="selected-date-display">
-                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('nl-NL', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                    {new Date(selectedDate + "T00:00:00").toLocaleDateString("nl-NL", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
                     })}
-                    {selectedDate === new Date().toISOString().split('T')[0] && (
+                    {selectedDate === new Date().toISOString().split("T")[0] && (
                       <span className="today-badge">Vandaag</span>
                     )}
-                    {isPastDateFromToday(selectedDate) && selectedDate !== new Date().toISOString().split('T')[0] && (
-                      <span className="past-date-badge">Verleden</span>
-                    )}
+                    {isPastDateFromToday(selectedDate) &&
+                      selectedDate !== new Date().toISOString().split("T")[0] && (
+                        <span className="past-date-badge">Verleden</span>
+                      )}
                   </div>
                 </div>
+
                 <div className="date-selector">
                   <label>Datum kiezen:</label>
-                  <input 
-                    type="date" 
-                    value={selectedDate} 
+                  <input
+                    type="date"
+                    value={selectedDate}
                     onChange={(e) => {
                       setSelectedDate(e.target.value);
-                      // Update calendar to show the selected month
                       const newDate = new Date(e.target.value);
                       setCurrentMonth(new Date(newDate.getFullYear(), newDate.getMonth()));
                     }}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={new Date().toISOString().split("T")[0]}
                   />
                 </div>
               </div>
 
               <div className="form-sections">
-                {/* BASIS SECTIE */}
+                {/* BASIS */}
                 <div className="form-section-card">
                   <h4>🍽️ Basisgegevens</h4>
                   <div className="form-row">
                     {renderOptionButtons("Voeding", ["Weinig", "Normaal", "Veel"], food, setFood)}
                     {renderOptionButtons("Eetlust", ["Slecht", "Normaal", "Goed", "Overmatig"], appetite, setAppetite)}
                   </div>
+
                   <div className="form-row">
                     <div className="input-group">
                       <label>💧 Water (ml)</label>
-                      <input type="number" value={water} onChange={(e) => setWater(e.target.value)} placeholder="500" />
+                      <input
+                        type="number"
+                        value={water}
+                        onChange={(e) => {
+                          setWater(e.target.value);
+                          trackFieldChanged("water", e.target.value, "number", 500);
+                        }}
+                        placeholder="500"
+                      />
                     </div>
+
                     <div className="input-group">
                       <label>💤 Slaap (uren)</label>
-                      <input type="number" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} placeholder="8" />
+                      <input
+                        type="number"
+                        value={sleepHours}
+                        onChange={(e) => {
+                          setSleepHours(e.target.value);
+                          trackFieldChanged("sleepHours", e.target.value, "number", 500);
+                        }}
+                        placeholder="8"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* ACTIVITEIT SECTIE */}
+                {/* ACTIVITEIT */}
                 <div className="form-section-card">
                   <h4>🎾 Activiteit</h4>
                   <div className="form-row">
                     {renderOptionButtons("Energie", ["Laag", "Normaal", "Hoog"], energyLevel, setEnergyLevel)}
                     {renderOptionButtons("Gedrag", ["Actief", "Rustig", "Sloom", "Onrustig"], behavior, setBehavior)}
                   </div>
+
                   <div className="form-row">
                     <div className="input-group">
                       <label>🚶 Wandelingen</label>
-                      <input type="number" value={walks} onChange={(e) => setWalks(e.target.value)} placeholder="2" />
+                      <input
+                        type="number"
+                        value={walks}
+                        onChange={(e) => {
+                          setWalks(e.target.value);
+                          trackFieldChanged("walks", e.target.value, "number", 500);
+                        }}
+                        placeholder="2"
+                      />
                     </div>
+
                     <div className="input-group">
                       <label>🎾 Speeltijd (min)</label>
-                      <input type="number" value={playtimeMinutes} onChange={(e) => setPlaytimeMinutes(e.target.value)} placeholder="30" />
+                      <input
+                        type="number"
+                        value={playtimeMinutes}
+                        onChange={(e) => {
+                          setPlaytimeMinutes(e.target.value);
+                          trackFieldChanged("playtimeMinutes", e.target.value, "number", 500);
+                        }}
+                        placeholder="30"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* GEZONDHEID SECTIE */}
+                {/* GEZONDHEID */}
                 <div className="form-section-card">
                   <h4>🏥 Gezondheid</h4>
                   <div className="form-row">
                     {renderOptionButtons("Ontlasting", ["Geen", "Hard", "Normaal", "Zacht", "Diarree"], poop, setPoop)}
                     {renderOptionButtons("Emotie", ["Blij", "Neutraal", "Angstig", "Gestrest"], emotion, setEmotion)}
                   </div>
+
                   <div className="checkbox-grid">
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setVomit(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={vomit}
+                        onChange={(e) => {
+                          setVomit(e.target.checked);
+                          trackFieldChanged("vomit", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>🤮 Overgegeven</span>
                     </label>
+
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setMeds(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={meds}
+                        onChange={(e) => {
+                          setMeds(e.target.checked);
+                          trackFieldChanged("meds", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>💊 Medicatie</span>
                     </label>
+
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setStressSignals(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={stressSignals}
+                        onChange={(e) => {
+                          setStressSignals(e.target.checked);
+                          trackFieldChanged("stressSignals", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>😰 Stress-signalen</span>
                     </label>
+
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setPainSignals(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={painSignals}
+                        onChange={(e) => {
+                          setPainSignals(e.target.checked);
+                          trackFieldChanged("painSignals", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>🩹 Pijn-signalen</span>
                     </label>
+
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setTrainingDone(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={trainingDone}
+                        onChange={(e) => {
+                          setTrainingDone(e.target.checked);
+                          trackFieldChanged("trainingDone", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>🎓 Training gedaan</span>
                     </label>
+
                     <label className="checkbox-item">
-                      <input type="checkbox" onChange={e => setLeftAloneTooLong(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={leftAloneTooLong}
+                        onChange={(e) => {
+                          setLeftAloneTooLong(e.target.checked);
+                          trackFieldChanged("leftAloneTooLong", e.target.checked, "boolean", 200);
+                        }}
+                      />
                       <span>⏰ Te lang alleen</span>
                     </label>
                   </div>
                 </div>
 
-                {/* ZORGEN SECTIE */}
+                {/* ZORGEN */}
                 <div className="form-section-card">
                   <h4>❤️ Zorgen</h4>
                   {renderOptionButtons("Maak je je zorgen?", ["Nee", "Een beetje", "Ja", "Veel"], ownerConcern, setOwnerConcern)}
+
                   <div className="form-row">
                     <div className="input-group">
                       <label>🏠 Alleen thuis (uren)</label>
-                      <input type="number" value={aloneHours} onChange={(e) => setAloneHours(e.target.value)} placeholder="4" />
+                      <input
+                        type="number"
+                        value={aloneHours}
+                        onChange={(e) => {
+                          setAloneHours(e.target.value);
+                          trackFieldChanged("aloneHours", e.target.value, "number", 500);
+                        }}
+                        placeholder="4"
+                      />
                     </div>
                   </div>
                 </div>

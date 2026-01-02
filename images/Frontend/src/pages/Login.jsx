@@ -23,10 +23,23 @@ export default function Login() {
 
 		if (res.ok) {
 			// ⬅️ BELOANGRIJK: USER ID & ROLE OPSLAAN
-			localStorage.setItem("userId", data._id);
+			const userId = data._id;
+			localStorage.setItem("userId", userId);
+			localStorage.setItem("userUID", `uid_${userId}`); // Always match current user
 			localStorage.setItem("userName", data.name);
-			localStorage.setItem("userRole", data.role || 'user'); // 👈 nieuw
-
+			localStorage.setItem("userRole", data.role || 'user');
+			
+			// Generate frontend sessionId
+			const sessionId = `session_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+			localStorage.setItem("sessionId", sessionId);
+			
+			// Store backend sessionId if returned (for cookie consistency)
+			if (data.sessionId) {
+				localStorage.setItem("backendSessionId", data.sessionId);
+			}
+			
+			console.log('🔑 Login successful:', { userId, userUID: `uid_${userId}`, sessionId });
+			
 			setMessage(`✅ Welkom, ${data.name}`);
 			setTimeout(() => {
 				navigate("/my-dogs");

@@ -41,7 +41,20 @@ export default function Register() {
 
       const responseData = await res.json();
 
-      if (res.ok) {
+if (res.ok) {
+        // Store user identity immediately after successful registration
+        const userId = responseData._id;
+        localStorage.setItem("userId", userId);
+        localStorage.setItem("userUID", `uid_${userId}`);
+        localStorage.setItem("userName", responseData.name);
+        localStorage.setItem("userRole", responseData.role || 'user');
+        
+        // Generate frontend sessionId
+        const sessionId = `session_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+        localStorage.setItem("sessionId", sessionId);
+        
+        console.log('🔑 Registration successful:', { userId, userUID: `uid_${userId}`, sessionId });
+        
         setMessage("✅ Account aangemaakt!");
         setTimeout(() => {
           navigate("/login");
