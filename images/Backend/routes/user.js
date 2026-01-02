@@ -54,10 +54,15 @@ router.post("/login", async (req, res) => {
   const { createSession } = require('../models/Session');
   await createSession(user._id.toString(), sessionId, req.ip, req.get('User-Agent'));
   
+  // Update user's last login time
+  const { updateUserLastLogin } = require('../models/User');
+  await updateUserLastLogin(user._id);
+  
   // Set session cookie
   res.cookie('sessionId', sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Allow for HTTP development
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   });
 

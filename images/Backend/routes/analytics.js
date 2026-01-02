@@ -179,4 +179,71 @@ router.get('/health', (req, res) => {
   });
 });
 
+// GET /api/analytics/user/:userUID - Get user analytics data
+router.get('/user/:userUID', async (req, res) => {
+  try {
+    const { userUID } = req.params;
+    const { timeRange = '30d' } = req.query;
+    
+    if (!userUID) {
+      return res.status(400).json({
+        ok: false,
+        error: 'userUID is required'
+      });
+    }
+    
+    // Calculate date range
+    const daysBack = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90
+    }[timeRange] || 30;
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+    
+    const { AnalyticsEvent, mongoose } = require('../models/AnalyticsEvent');
+    
+    let events;
+    if (mongoose && AnalyticsEvent) {
+      events = await AnalyticsEvent
+        .find({ 
+          userUID,
+          serverTs: { $gte: startDate }
+        })
+        .sort({ serverTs: -1 })
+        .lean();
+    } else {
+      // Fallback to native MongoDB driver
+      const { getDB } = require('../db');
+      const db = getDB();
+      const collection = db.collection('analytics_events');
+      events = await collection
+        .find({ 
+          userUID,
+          serverTs: { $gte: startDate }
+        })
+        .sort({ serverTs: -1 })
+        .toArray();
+    }
+    
+    // Calculate summary statistics
+    const summary = {
+      totalEvents: events.length,
+      dateRange: `${daysBack} days`,
+      timeRange,
+      events
+    };
+    
+    return res.json(summary);
+    
+  } catch (error) {
+    console.error('User analytics route error:', error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;

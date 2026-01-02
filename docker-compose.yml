@@ -17,12 +17,12 @@ services:
       context: ./images/Backend
       dockerfile: Dockerfile
     ports:
-      - "5003:5002"
+      - "5003:5005"
     depends_on:
       - mongo
     environment:
       - MONGO_URL=mongodb://mongo:27017/petlog
-      - NODE_ENV=production
+      - NODE_ENV=development
 
   mongo:
     image: mongo:7

@@ -4,15 +4,17 @@ const { ObjectId } = require("mongodb");
 async function createSession({ userId, sessionId, ipAddress, userAgent }) {
   const db = getDB();
 
-  const newSession = {
+const newSession = {
     userId: new ObjectId(userId),
     sessionId,
+    createdAt: new Date(), // Changed from loginTime to match frontend expectations
     loginTime: new Date(),
     isActive: true,
     ipAddress,
     userAgent,
     pageViews: 0,
     actions: [],
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
   };
 
   const result = await db.collection("sessions").insertOne(newSession);
@@ -36,6 +38,7 @@ async function endSession(sessionId) {
         logoutTime,
         duration,
         isActive: false,
+        expiresAt: new Date() // Set expiresAt to now when session ends
       },
     }
   );
