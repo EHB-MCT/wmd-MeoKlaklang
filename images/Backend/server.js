@@ -12,10 +12,14 @@ const adminRoutes = require("./routes/admin");
 const analyticsRoutes = require("./routes/analytics");
 const sessionsRoutes = require("./routes/sessions");
 
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
+
 const app = express();
 
-// Admin session middleware
-const session = require("express-session");
+// ✅ middleware FIRST
+app.use(cookieParser());
+
 app.use(
   session({
     secret: process.env.ADMIN_SESSION_SECRET || "your-secret-key-change-in-production",
@@ -61,7 +65,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sessions", sessionsRoutes);
 
 // Create admin user endpoint
-const createAdminUser = require("./models/User").createAdminUser;
+const { createAdminUser } = require("./models/User");
 app.post("/api/create-admin", async (req, res) => {
   try {
     const adminUser = await createAdminUser("admin", "admin123");

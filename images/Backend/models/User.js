@@ -166,57 +166,94 @@ async function getUserById(userId) {
   };
 }
 
-async function getUserAnalytics(userId, timeRange = '30d') {
-  const db = getDB();
-  const { ObjectId } = require("mongodb");
-  
-  // Calculate date range
-  const now = new Date();
-  const daysBack = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 30;
-  const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000));
-  
-  // Get user's events
-  const events = await db
-    .collection("events")
-    .aggregate([
+async function getUserAnalytics(userId, timeRange = "30d") {
+  try {
+    const db = getDB();
+    const { ObjectId } = require("mongodb");
+
+    // Date range
+    const now = new Date();
+    const daysBack =
+      timeRange === "7d" ? 7 :
+      timeRange === "30d" ? 30 :
+      timeRange === "90d" ? 90 : 30;
+
+    const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+
+    // Safe ObjectId conversion
+    let userObjectId = null;
+    try {
+      userObjectId = new ObjectId(userId);
+    } catch {
+      userObjectId = null;
+    }
+
+    // Match user as BOTH string or ObjectId
+    const matchUser = userObjectId
+      ? { $or: [{ userId: userId }, { userId: userObjectId }] }
+      : { userId: userId };
+
+    // ---- EVENTS ----
+    // Use "events" collection (Mongo does not error if empty / not created yet)
+    const events = await db.collection("events").aggregate([
       {
         $match: {
-          userId: new ObjectId(userId),
-          timestamp: { $gte: startDate }
+          ...matchUser,
+          // some trackers use "timestamp", some use "createdAt"
+          $or: [
+            { timestamp: { $gte: startDate } },
+            { createdAt: { $gte: startDate } }
+          ]
+        }
+      },
+      {
+        $addFields: {
+          safeType: { $ifNull: ["$type", { $ifNull: ["$eventName", "unknown"] }] },
+          safeTime: { $ifNull: ["$timestamp", { $ifNull: ["$createdAt", new Date()] }] }
         }
       },
       {
         $group: {
-          _id: "$type",
+          _id: "$safeType",
           count: { $sum: 1 },
-          lastOccurrence: { $max: "$timestamp" }
+          lastOccurrence: { $max: "$safeTime" }
         }
-      }
-    ])
-    .toArray();
-    
-  // Get user's sessions
-  const sessions = await db
-    .collection("events")
-    .aggregate([
+      },
+      { $sort: { count: -1 } }
+    ]).toArray();
+
+    // ---- SESSIONS SUMMARY from events ----
+    const sessionsAgg = await db.collection("events").aggregate([
       {
         $match: {
-          userId: new ObjectId(userId),
-          timestamp: { $gte: startDate }
+          ...matchUser,
+          $or: [
+            { timestamp: { $gte: startDate } },
+            { createdAt: { $gte: startDate } }
+          ]
+        }
+      },
+      {
+        $addFields: {
+          safeTime: { $ifNull: ["$timestamp", { $ifNull: ["$createdAt", new Date()] }] },
+          safeSessionId: { $ifNull: ["$sessionId", "unknown-session"] },
+          safeType: { $ifNull: ["$type", { $ifNull: ["$eventName", "unknown"] }] }
         }
       },
       {
         $group: {
-          _id: "$sessionId",
-          startTime: { $min: "$timestamp" },
-          endTime: { $max: "$timestamp" },
-          duration: { $subtract: [{ $max: "$timestamp" }, { $min: "$timestamp" }] },
+          _id: "$safeSessionId",
+          startTime: { $min: "$safeTime" },
+          endTime: { $max: "$safeTime" },
           eventCount: { $sum: 1 },
           pageViews: {
-            $sum: {
-              $cond: [{ $eq: ["$type", "page_view"] }, 1, 0]
-            }
+            $sum: { $cond: [{ $eq: ["$safeType", "page_view"] }, 1, 0] }
           }
+        }
+      },
+      {
+        $addFields: {
+          duration: { $subtract: ["$endTime", "$startTime"] }
         }
       },
       {
@@ -228,36 +265,56 @@ async function getUserAnalytics(userId, timeRange = '30d') {
           avgPageViews: { $avg: "$pageViews" },
           bounceRate: {
             $avg: {
-              $cond: [
-                { $eq: ["$pageViews", 1] },
-                1, 0
-              ]
+              $cond: [{ $eq: ["$pageViews", 1] }, 1, 0]
             }
           }
         }
       }
-    ])
-    .toArray();
+    ]).toArray();
 
-  // Get user's dogs and entries
-  const dogsCount = await db.collection("dogs").countDocuments({ userId: new ObjectId(userId) });
-  const entriesCount = await db.collection("entries").countDocuments({ userId: new ObjectId(userId) });
+    const sessionsSummary = sessionsAgg[0] || {};
 
-  return {
-    events,
-    sessions: sessions[0] || {},
-    summary: {
-      totalEvents: sessions[0]?.totalEvents || 0,
-      totalSessions: sessions[0]?.totalSessions || 0,
-      avgSessionDuration: sessions[0]?.avgSessionDuration || 0,
-      avgPageViews: sessions[0]?.avgPageViews || 0,
-      bounceRate: sessions[0]?.bounceRate || 0,
-      totalDogs: dogsCount,
-      totalEntries: entriesCount,
-      lastLogin: new Date()
-    }
-  };
+    // ---- DOGS / ENTRIES ----
+    // your dogs/entries store ObjectId userId, so only count if valid ObjectId
+    const dogsCount = userObjectId ? await db.collection("dogs").countDocuments({ userId: userObjectId }) : 0;
+    const entriesCount = userObjectId ? await db.collection("entries").countDocuments({ userId: userObjectId }) : 0;
+
+    return {
+      events,
+      sessions: sessionsSummary,
+      summary: {
+        totalEvents: sessionsSummary.totalEvents || 0,
+        totalSessions: sessionsSummary.totalSessions || 0,
+        avgSessionDuration: sessionsSummary.avgSessionDuration || 0,
+        avgPageViews: sessionsSummary.avgPageViews || 0,
+        bounceRate: sessionsSummary.bounceRate || 0,
+        totalDogs: dogsCount,
+        totalEntries: entriesCount,
+        lastLogin: new Date()
+      }
+    };
+  } catch (err) {
+    console.error("❌ getUserAnalytics crashed:", err);
+    // Never crash the API: return safe default
+    return {
+      events: [],
+      sessions: {},
+      summary: {
+        totalEvents: 0,
+        totalSessions: 0,
+        avgSessionDuration: 0,
+        avgPageViews: 0,
+        bounceRate: 0,
+        totalDogs: 0,
+        totalEntries: 0,
+        lastLogin: new Date()
+      },
+      error: "analytics_failed"
+    };
+  }
 }
+
+
 
 async function deactivateUser(userId) {
   const db = getDB();
