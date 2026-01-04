@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Line, Bar } from 'react-chartjs-2';
+// src/pages/Analytics.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Line, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,10 +12,9 @@ import {
   Title,
   Tooltip,
   Legend,
-  TimeScale
-} from 'chart.js';
-import '../App.css';
-import './Analytics.css';
+  Filler,
+} from "chart.js";
+import "./Analytics.css";
 
 ChartJS.register(
   CategoryScale,
@@ -24,263 +25,434 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  Filler
 );
 
-const Analytics = () => {
-  const [analyticsData, setAnalyticsData] = useState(null);
-  const [sessions, setSessions] = useState([]);
-  const [healthAlerts, setHealthAlerts] = useState(null); // optional (can remain null)
-  const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('30d');
+// -----------------------------
+// Helpers
+// -----------------------------
+const TIME_RANGES = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
+const ALL_EMOTIONS = [
+  "Blij",
+  "Kalm",
+  "Energiek",
+  "Neutraal",
+  "Angstig",
+  "Gestrest",
+  "Verdrietig",
+  "Boos",
+  "Slaperig",
+  "Speels",
+];
+
+const isoDay = (d) => {
+  const date = new Date(d);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const toNlShort = (iso) => {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}`;
+};
+
+const clampNumber = (v, fallback = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const getStartDate = (timeRange) => {
+  const days = TIME_RANGES[timeRange] ?? 30;
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+const makeDaySeries = (timeRange) => {
+  const start = getStartDate(timeRange);
+  const days = TIME_RANGES[timeRange] ?? 30;
+
+  const labels = [];
+  const keys = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const key = isoDay(d);
+    keys.push(key);
+    labels.push(toNlShort(key));
+  }
+  return { keys, labels };
+};
+
+// -----------------------------
+// Component
+// -----------------------------
+export default function Analytics() {
+  const navigate = useNavigate();
 
   const userId = localStorage.getItem("userId");
+  const [timeRange, setTimeRange] = useState("30d");
 
+  const [dogs, setDogs] = useState([]);
+  const [selectedDogId, setSelectedDogId] = useState("all");
+
+  const [sessions, setSessions] = useState([]);
+  const [entries, setEntries] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // -----------------------------
+  // Fetch
+  // -----------------------------
   useEffect(() => {
     if (!userId) {
       setLoading(false);
+      setError("Geen userId gevonden. Log opnieuw in.");
       return;
     }
-    fetchAnalyticsData();
-    fetchSessions();
-    // fetchHealthAlerts(); // ❌ route currently 404 in your backend
-  }, [timeRange, userId]);
 
-  const fetchAnalyticsData = async () => {
-    try {
-      // ✅ Use userId, not userUID
-      const response = await fetch(`/api/analytics/user/${userId}?timeRange=${timeRange}`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAnalyticsData(data);
-      } else {
-        console.error("Analytics fetch failed:", response.status);
+    const fetchAll = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [sessionsRes, entriesRes, dogsRes] = await Promise.all([
+          fetch(`/api/sessions/user/${userId}?timeRange=${timeRange}`, { credentials: "include" }),
+          fetch(`/api/entries?userId=${userId}`, { credentials: "include" }),
+          fetch(`/api/dogs/${userId}`, { credentials: "include" }),
+        ]);
+
+        if (!sessionsRes.ok) throw new Error(`Sessions error (${sessionsRes.status})`);
+        if (!entriesRes.ok) throw new Error(`Entries error (${entriesRes.status})`);
+        if (!dogsRes.ok) throw new Error(`Dogs error (${dogsRes.status})`);
+
+        const sessionsData = await sessionsRes.json();
+        const entriesData = await entriesRes.json();
+        const dogsData = await dogsRes.json();
+
+        setSessions(Array.isArray(sessionsData?.sessions) ? sessionsData.sessions : []);
+        setEntries(Array.isArray(entriesData) ? entriesData : []);
+        setDogs(Array.isArray(dogsData) ? dogsData : []);
+      } catch (e) {
+        console.error(e);
+        setError("❌ Kon analytics data niet laden. Check backend routes/logs.");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSessions = async () => {
-    try {
-      const response = await fetch(`/api/sessions/user/${userId}?timeRange=${timeRange}`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.sessions || []);
-      } else {
-        console.error('Sessions fetch failed:', response.status);
-      }
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
-    }
-  };
-
-  // Optional: only enable this if you truly have that backend endpoint.
-  // const fetchHealthAlerts = async () => {
-  //   try {
-  //     const response = await fetch(`/api/sessions/user/${userId}/health-alerts?timeRange=${timeRange}`, {
-  //       credentials: "include"
-  //     });
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       setHealthAlerts(data);
-  //     } else {
-  //       console.error("Health alerts fetch failed:", response.status);
-  //     }
-  //   } catch (error) {
-  //     console.error('Error fetching health alerts:', error);
-  //   }
-  // };
-
-  const processLoginData = () => {
-    if (!sessions.length) return { labels: [], data: [] };
-
-    const loginCounts = {};
-    sessions.forEach(session => {
-      const date = new Date(session.createdAt).toLocaleDateString('nl-NL');
-      loginCounts[date] = (loginCounts[date] || 0) + 1;
-    });
-
-    const sortedDates = Object.keys(loginCounts).sort((a, b) => new Date(a) - new Date(b));
-
-    return {
-      labels: sortedDates,
-      data: sortedDates.map(date => loginCounts[date])
     };
-  };
 
-  const processWeeklyData = () => {
-    if (!sessions.length) return { labels: [], data: [] };
+    fetchAll();
+  }, [userId, timeRange]);
 
-    const weekDays = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
-    const weeklyLogins = [0, 0, 0, 0, 0, 0, 0];
-
-    sessions.forEach(session => {
-      const dayOfWeek = new Date(session.createdAt).getDay();
-      const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      weeklyLogins[adjustedDay]++;
+  // -----------------------------
+  // Filter entries by dog + timeRange
+  // -----------------------------
+  const filteredEntries = useMemo(() => {
+    const start = getStartDate(timeRange);
+    return entries.filter((e) => {
+      const inRange = new Date(e.date || e.createdAt || Date.now()) >= start;
+      const matchesDog = selectedDogId === "all" ? true : String(e.dogId) === String(selectedDogId);
+      return inRange && matchesDog;
     });
+  }, [entries, timeRange, selectedDogId]);
 
-    return { labels: weekDays, data: weeklyLogins };
-  };
+  const filteredSessions = useMemo(() => {
+    const start = getStartDate(timeRange);
+    return sessions.filter((s) => new Date(s.createdAt || s.startTime || Date.now()) >= start);
+  }, [sessions, timeRange]);
 
-  const generateActivityHeatmap = () => {
-    if (!sessions.length) return [];
+  // -----------------------------
+  // Stats
+  // -----------------------------
+  const stats = useMemo(() => {
+    const totalSessions = filteredSessions.length;
 
-    const activityMap = {};
-    const today = new Date();
-    const daysBack = 90;
+    const totalDurationMs = filteredSessions.reduce(
+      (sum, s) => sum + clampNumber(s.calculatedDuration, 0),
+      0
+    );
 
-    for (let i = 0; i < daysBack; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      activityMap[dateStr] = 0;
-    }
+    const avgDurationMin =
+      totalSessions > 0 ? Math.round(totalDurationMs / totalSessions / 1000 / 60) : 0;
 
-    sessions.forEach(session => {
-      const dateStr = new Date(session.createdAt).toISOString().split('T')[0];
-      if (activityMap.hasOwnProperty(dateStr)) {
-        activityMap[dateStr] += (session.pageViews || 0) + (session.eventCount || 0);
-      }
-    });
+    const totalPageViews = filteredSessions.reduce((sum, s) => sum + clampNumber(s.pageViews, 0), 0);
 
-    return Object.entries(activityMap).map(([date, activity]) => ({
-      date,
-      activity,
-      intensity: getActivityIntensity(activity)
-    })).reverse();
-  };
+    const lastLogin =
+      filteredSessions.length > 0
+        ? new Date(filteredSessions[0]?.createdAt).toLocaleString("nl-NL")
+        : "Nooit";
 
-  const getActivityIntensity = (activity) => {
-    if (activity === 0) return 0;
-    if (activity <= 5) return 1;
-    if (activity <= 10) return 2;
-    if (activity <= 20) return 3;
-    return 4;
-  };
-
-  const calculateSessionStats = () => {
-    if (!sessions.length) {
-      return {
-        totalSessions: 0,
-        avgDuration: 0,
-        totalDuration: 0,
-        activeSessions: 0,
-        lastLogin: 'Nooit',
-        totalEvents: 0,
-        totalPageViews: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalDays: 0
-      };
-    }
-
-    const totalSessions = sessions.length;
-    const activeSessions = sessions.filter(s => s.isActive).length;
-
-    const totalDurationMs = sessions.reduce((sum, s) => sum + (s.calculatedDuration || 0), 0);
-    const avgDurationMs = totalSessions > 0 ? totalDurationMs / totalSessions : 0;
-
-    const streakData = calculateLoginStreak();
+    const activeDays = new Set(
+      filteredSessions.map((s) => isoDay(s.createdAt || s.startTime || Date.now()))
+    ).size;
 
     return {
       totalSessions,
-      activeSessions,
-      avgDuration: Math.round(avgDurationMs / 1000 / 60),
-      totalDuration: Math.round(totalDurationMs / 1000 / 60),
-      lastLogin: sessions[0]?.createdAt ? new Date(sessions[0].createdAt).toLocaleString('nl-NL') : 'Nooit',
-      totalEvents: sessions.reduce((sum, s) => sum + (s.eventCount || 0), 0),
-      totalPageViews: sessions.reduce((sum, s) => sum + (s.pageViews || 0), 0),
-      ...streakData
+      avgDurationMin,
+      totalDurationMin: Math.round(totalDurationMs / 1000 / 60),
+      totalPageViews,
+      lastLogin,
+      activeDays,
+      entriesCount: filteredEntries.length,
     };
+  }, [filteredSessions, filteredEntries]);
+
+  // -----------------------------
+  // Charts data builders
+  // -----------------------------
+  const chartTheme = {
+    grid: "rgba(17, 24, 39, 0.08)",
+    text: "#111827",
+    accent: "#4f46e5",
+    accentSoft: "rgba(79, 70, 229, 0.18)",
+    accent2: "#06b6d4",
+    accent2Soft: "rgba(6, 182, 212, 0.18)",
+    accent3: "#f59e0b",
+    accent3Soft: "rgba(245, 158, 11, 0.20)",
+    danger: "#ef4444",
+    dangerSoft: "rgba(239, 68, 68, 0.18)",
   };
 
-  const calculateLoginStreak = () => {
-    if (!sessions.length) return { currentStreak: 0, longestStreak: 0, totalDays: 0 };
+  const baseLineOptions = (title) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "top", labels: { color: chartTheme.text } },
+      title: { display: true, text: title, color: chartTheme.text, font: { size: 16, weight: "700" } },
+      tooltip: { enabled: true },
+    },
+    scales: {
+      x: { ticks: {
+  color: "#111827",   // bijna zwart (zeer leesbaar)
+  font: {
+    size: 12,
+    weight: "600"
+  }
+}
+, grid: { color: chartTheme.grid } },
+      y: { beginAtZero: true, ticks: { color: chartTheme.text }, grid: { color: chartTheme.grid } },
+    },
+  });
 
-    const loginDates = [...new Set(
-      sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0])
-    )].sort((a, b) => new Date(a) - new Date(b));
+  const baseBarOptions = (title, stacked = false) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "top", labels: { color: chartTheme.text } },
+      title: { display: true, text: title, color: chartTheme.text, font: { size: 16, weight: "700" } },
+      tooltip: { enabled: true },
+    },
+    scales: {
+      x: {
+        stacked,
+        ticks: { color: chartTheme.text },
+        grid: { color: chartTheme.grid },
+      },
+      y: {
+        stacked,
+        beginAtZero: true,
+        ticks: { color: chartTheme.text },
+        grid: { color: chartTheme.grid },
+      },
+    },
+  });
 
-    let longestStreak = 0;
-    let tempStreak = 0;
-    let previousDate = null;
+  // 1) Sessions / logins per dag (line)
+  const dailySessionsChart = useMemo(() => {
+    const { keys, labels } = makeDaySeries(timeRange);
+    const counts = Object.fromEntries(keys.map((k) => [k, 0]));
 
-    loginDates.forEach((date, idx) => {
-      if (idx === 0) {
-        tempStreak = 1;
-      } else {
-        const daysDiff = Math.floor((new Date(date) - new Date(previousDate)) / (1000 * 60 * 60 * 24));
-        if (daysDiff === 1) tempStreak++;
-        else {
-          longestStreak = Math.max(longestStreak, tempStreak);
-          tempStreak = 1;
-        }
-      }
-      previousDate = date;
+    filteredSessions.forEach((s) => {
+      const key = isoDay(s.createdAt || s.startTime || Date.now());
+      if (counts[key] !== undefined) counts[key] += 1;
     });
-
-    longestStreak = Math.max(longestStreak, tempStreak);
-
-    const today = new Date().toISOString().split('T')[0];
-    const mostRecentLogin = loginDates[loginDates.length - 1];
-    const daysSinceLastLogin = Math.floor((new Date(today) - new Date(mostRecentLogin)) / (1000 * 60 * 60 * 24));
-    const currentStreak = daysSinceLastLogin <= 1 ? tempStreak : 0;
-
-    return { currentStreak, longestStreak, totalDays: loginDates.length };
-  };
-
-  const calculateAnalyticsStats = () => {
-    const events = analyticsData?.events || [];
-    if (!events.length) return { totalEvents: 0, uniqueEvents: 0, topEvents: [] };
-
-    const eventTypeCount = {};
-    events.forEach(e => {
-      eventTypeCount[e.eventName] = (eventTypeCount[e.eventName] || 0) + 1;
-    });
-
-    const topEvents = Object.entries(eventTypeCount)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
 
     return {
-      totalEvents: events.length,
-      uniqueEvents: Object.keys(eventTypeCount).length,
-      topEvents
+      labels,
+      data: keys.map((k) => counts[k]),
     };
-  };
+  }, [filteredSessions, timeRange]);
 
-  const lineChartData = processLoginData();
-  const weeklyData = processWeeklyData();
-  const sessionStats = calculateSessionStats();
-  const analyticsStats = calculateAnalyticsStats();
-  const heatmapData = generateActivityHeatmap();
+  // 2) Logout per uur (bar)
+  const logoutHourChart = useMemo(() => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const counts = Array.from({ length: 24 }, () => 0);
 
-  const lineChartOptions = {
-    responsive: true,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: 'Aantal logins per dag', font: { size: 16 } }
-    },
-    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-  };
+    filteredSessions.forEach((s) => {
+      const start = new Date(s.createdAt || s.startTime || Date.now());
+      const duration = clampNumber(s.calculatedDuration, 0);
 
-  const barChartOptions = {
-    responsive: true,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: 'Logins per dag van de week', font: { size: 16 } }
-    },
-    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-  };
+      // logoutAt can be provided by backend, else estimate with createdAt + duration
+      const logoutAt = s.endedAt
+        ? new Date(s.endedAt)
+        : duration > 0
+          ? new Date(start.getTime() + duration)
+          : null;
+
+      if (!logoutAt) return;
+      const h = logoutAt.getHours();
+      counts[h] += 1;
+    });
+
+    return { labels: hours.map((h) => `${h}u`), data: counts };
+  }, [filteredSessions]);
+
+  // 3) Emoties verdeling (bar) - alle emoties zichtbaar
+  const emotionCountsChart = useMemo(() => {
+    const counts = {};
+    ALL_EMOTIONS.forEach((e) => (counts[e] = 0));
+
+    filteredEntries.forEach((en) => {
+      const emo = (en.emotion || "").trim();
+      if (!emo) return;
+      if (counts[emo] === undefined) counts[emo] = 0; // onbekende emotie toch tonen
+      counts[emo] += 1;
+    });
+
+    const labels = Object.keys(counts);
+    const data = labels.map((l) => counts[l]);
+
+    return { labels, data };
+  }, [filteredEntries]);
+
+  // 4) Emotie tijdlijn (stacked bar per dag)
+  const emotionTimelineChart = useMemo(() => {
+    const { keys, labels } = makeDaySeries(timeRange);
+
+    // set of emotions to show = all known + any unknown in data
+    const emotionsSet = new Set(ALL_EMOTIONS);
+    filteredEntries.forEach((en) => {
+      if (en.emotion) emotionsSet.add(en.emotion);
+    });
+    const emotions = Array.from(emotionsSet);
+
+    // init day buckets
+    const dayMap = {};
+    keys.forEach((k) => {
+      dayMap[k] = {};
+      emotions.forEach((emo) => (dayMap[k][emo] = 0));
+    });
+
+    filteredEntries.forEach((en) => {
+      const day = isoDay(en.date || en.createdAt || Date.now());
+      const emo = en.emotion;
+      if (!emo) return;
+      if (!dayMap[day]) return;
+      if (dayMap[day][emo] === undefined) dayMap[day][emo] = 0;
+      dayMap[day][emo] += 1;
+    });
+
+    // datasets per emotion
+    const datasets = emotions.map((emo, idx) => {
+      // rotate through a small palette (Chart.js will render clearly)
+      const palette = [
+        { b: "#4f46e5", bg: "rgba(79, 70, 229, 0.25)" },
+        { b: "#06b6d4", bg: "rgba(6, 182, 212, 0.25)" },
+        { b: "#f59e0b", bg: "rgba(245, 158, 11, 0.25)" },
+        { b: "#10b981", bg: "rgba(16, 185, 129, 0.25)" },
+        { b: "#ef4444", bg: "rgba(239, 68, 68, 0.25)" },
+        { b: "#8b5cf6", bg: "rgba(139, 92, 246, 0.25)" },
+      ];
+      const c = palette[idx % palette.length];
+
+      return {
+        label: emo,
+        data: keys.map((k) => dayMap[k][emo] || 0),
+        backgroundColor: c.bg,
+        borderColor: c.b,
+        borderWidth: 1,
+      };
+    });
+
+    return { labels, datasets };
+  }, [filteredEntries, timeRange]);
+
+  // 5) Hovered options (bar)
+  const hoveredOptionsChart = useMemo(() => {
+    const counts = {};
+    filteredEntries.forEach((en) => {
+      const arr = Array.isArray(en.hoveredOptions) ? en.hoveredOptions : [];
+      arr.forEach((opt) => {
+        const key = String(opt);
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    });
+
+    const sorted = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    return {
+      labels: sorted.map(([k]) => k),
+      data: sorted.map(([, v]) => v),
+    };
+  }, [filteredEntries]);
+
+  // 6) Dog metrics per dag (line): water/sleep/walks (avg per dag)
+  const dogMetricsCharts = useMemo(() => {
+    const { keys, labels } = makeDaySeries(timeRange);
+
+    const buckets = Object.fromEntries(
+      keys.map((k) => [
+        k,
+        { waterSum: 0, waterN: 0, sleepSum: 0, sleepN: 0, walksSum: 0, walksN: 0 },
+      ])
+    );
+
+    filteredEntries.forEach((en) => {
+      const day = isoDay(en.date || en.createdAt || Date.now());
+      const b = buckets[day];
+      if (!b) return;
+
+      const water = clampNumber(en.water, NaN);
+      if (Number.isFinite(water)) {
+        b.waterSum += water;
+        b.waterN += 1;
+      }
+      const sleep = clampNumber(en.sleepHours, NaN);
+      if (Number.isFinite(sleep)) {
+        b.sleepSum += sleep;
+        b.sleepN += 1;
+      }
+      const walks = clampNumber(en.walks, NaN);
+      if (Number.isFinite(walks)) {
+        b.walksSum += walks;
+        b.walksN += 1;
+      }
+    });
+
+    const avg = (sum, n) => (n > 0 ? sum / n : 0);
+
+    const waterData = keys.map((k) => Math.round(avg(buckets[k].waterSum, buckets[k].waterN)));
+    const sleepData = keys.map((k) => Number(avg(buckets[k].sleepSum, buckets[k].sleepN).toFixed(1)));
+    const walksData = keys.map((k) => Number(avg(buckets[k].walksSum, buckets[k].walksN).toFixed(1)));
+
+    return { labels, waterData, sleepData, walksData };
+  }, [filteredEntries, timeRange]);
+
+  // -----------------------------
+  // UI: early return
+  // -----------------------------
+  if (!userId) {
+    return (
+      <div className="analytics-container">
+        <div className="loading">Geen gebruiker gevonden. Ga naar login.</div>
+        <button onClick={() => navigate("/login")} className="export-button">
+          ← Naar login
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -290,11 +462,51 @@ const Analytics = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="analytics-container">
+        <div className="loading">{error}</div>
+        <button onClick={() => window.location.reload()} className="export-button">
+          🔄 Opnieuw proberen
+        </button>
+      </div>
+    );
+  }
+
+  // -----------------------------
+  // Render
+  // -----------------------------
   return (
     <div className="analytics-container">
       <header className="analytics-header">
         <h1>📊 Jouw Analytics</h1>
-        <p>Inzicht in jouw gebruiksdata en patronen</p>
+        <p>Meer grafieken = meer inzicht. Filter per periode en per hond.</p>
+
+        {/* NAV (terug zoals in profile-style) */}
+        <nav className="nav-bar">
+          <button onClick={() => navigate("/my-dogs")}>🐕 Mijn dieren</button>
+          <button onClick={() => navigate("/daily-entry")}>📓 Logboek</button>
+          <button onClick={() => navigate("/profile")}>👤 Profiel</button>
+          <button className="active">📊 Analyse</button>
+          <button
+            onClick={() => {
+              const role = localStorage.getItem("userRole");
+              if (role === "admin" || role === "manager") navigate("/admin/dashboard");
+              else navigate("/admin/login");
+            }}
+          >
+            🔐 Admin
+          </button>
+          <button
+            className="logout-button"
+            onClick={() => {
+              localStorage.clear();
+              navigate("/login");
+            }}
+          >
+            🚪 Uitloggen
+          </button>
+        </nav>
 
         <div className="header-controls">
           <div className="time-range-selector">
@@ -305,123 +517,212 @@ const Analytics = () => {
               <option value="90d">Laatste 90 dagen</option>
             </select>
           </div>
+
+          <div className="time-range-selector">
+            <label>Hond:</label>
+            <select value={selectedDogId} onChange={(e) => setSelectedDogId(e.target.value)}>
+              <option value="all">Alle honden</option>
+              {dogs.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </header>
 
+      {/* STATS */}
       <section className="stats-section">
-        <h2>📈 Statistieken</h2>
+        <h2>📈 Overzicht</h2>
         <div className="stats-grid">
           <div className="stat-card featured">
             <div className="stat-icon">🚀</div>
-            <h3>Totale Sessions</h3>
-            <div className="stat-number">{sessionStats.totalSessions}</div>
-            <div className="stat-subtext">Actief: {sessionStats.activeSessions}</div>
+            <h3>Sessions</h3>
+            <div className="stat-number">{stats.totalSessions}</div>
+            <div className="stat-subtext">Actieve dagen: {stats.activeDays}</div>
           </div>
 
           <div className="stat-card featured">
             <div className="stat-icon">⏱️</div>
-            <h3>Gem. Duur</h3>
-            <div className="stat-number">{sessionStats.avgDuration} min</div>
-            <div className="stat-subtext">Totaal: {sessionStats.totalDuration} min</div>
+            <h3>Gem. duur</h3>
+            <div className="stat-number">{stats.avgDurationMin} min</div>
+            <div className="stat-subtext">Totaal: {stats.totalDurationMin} min</div>
           </div>
 
           <div className="stat-card">
-            <h3>🕐 Laatste Login</h3>
-            <div className="stat-text">{sessionStats.lastLogin}</div>
+            <h3>🕐 Laatste login</h3>
+            <div className="stat-text">{stats.lastLogin}</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-icon">👁️</div>
-            <h3>Page Views</h3>
-            <div className="stat-number">{sessionStats.totalPageViews}</div>
-            <div className="stat-subtext">Events: {sessionStats.totalEvents}</div>
-          </div>
-
-          <div className="stat-card streak-card">
-            <div className="streak-icon">🔥</div>
-            <h3>Huidige Streak</h3>
-            <div className="stat-number">{sessionStats.currentStreak}</div>
-            <div className="stat-subtext">Langste: {sessionStats.longestStreak} dagen</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon">📅</div>
-            <h3>Actieve Dagen</h3>
-            <div className="stat-number">{sessionStats.totalDays}</div>
-            <div className="stat-subtext">van de laatste {timeRange}</div>
+            <h3>Page views</h3>
+            <div className="stat-number">{stats.totalPageViews}</div>
+            <div className="stat-subtext">Entries: {stats.entriesCount}</div>
           </div>
         </div>
       </section>
 
-      <section className="heatmap-section">
-        <h2>🗓️ Activiteit Heatmap (Laatste 90 dagen)</h2>
-        <div className="heatmap-container">
-          <div className="heatmap-grid">
-            {heatmapData.map((day, index) => (
-              <div
-                key={index}
-                className="heatmap-cell"
-                data-intensity={day.intensity}
-                title={`${day.date}: ${day.activity} activiteiten`}
-              >
-                <span className="heatmap-date">{new Date(day.date).getDate()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      {/* CHARTS GRID */}
       <section className="charts-section">
+        <h2>📊 Grafieken</h2>
+
         <div className="charts-grid">
-          <div className="chart-container">
+          {/* Logins per dag */}
+          <div className="chart-container" style={{ height: 360 }}>
             <Line
+              options={baseLineOptions("Logins (sessions) per dag")}
               data={{
-                labels: lineChartData.labels,
-                datasets: [{
-                  label: 'Aantal Logins',
-                  data: lineChartData.data,
-                  borderColor: 'rgb(75, 192, 192)',
-                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                  tension: 0.1
-                }]
+                labels: dailySessionsChart.labels,
+                datasets: [
+                  {
+                    label: "Sessions",
+                    data: dailySessionsChart.data,
+                    borderColor: chartTheme.accent,
+                    backgroundColor: chartTheme.accentSoft,
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: 2,
+                  },
+                ],
               }}
-              options={lineChartOptions}
             />
           </div>
 
-          <div className="chart-container">
+          {/* Logout per uur */}
+          <div className="chart-container" style={{ height: 360 }}>
             <Bar
+              options={baseBarOptions("Wanneer log je uit? (per uur)")}
               data={{
-                labels: weeklyData.labels,
-                datasets: [{
-                  label: 'Logins',
-                  data: weeklyData.data,
-                  backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                  borderColor: 'rgba(54, 162, 235, 1)',
-                  borderWidth: 1
-                }]
+                labels: logoutHourChart.labels,
+                datasets: [
+                  {
+                    label: "Aantal uitlogs",
+                    data: logoutHourChart.data,
+                    backgroundColor: chartTheme.accent2Soft,
+                    borderColor: chartTheme.accent2,
+                    borderWidth: 2,
+                  },
+                ],
               }}
-              options={barChartOptions}
+            />
+          </div>
+
+          {/* Emoties verdeling */}
+          <div className="chart-container" style={{ height: 380 }}>
+            <Bar
+              options={baseBarOptions("Emoties van je hond (verdeling)")}
+              data={{
+                labels: emotionCountsChart.labels,
+                datasets: [
+                  {
+                    label: "Aantal logs",
+                    data: emotionCountsChart.data,
+                    backgroundColor: chartTheme.accent3Soft,
+                    borderColor: chartTheme.accent3,
+                    borderWidth: 2,
+                  },
+                ],
+              }}
+            />
+          </div>
+
+          {/* Emotie timeline */}
+          <div className="chart-container" style={{ height: 420 }}>
+            <Bar
+              options={baseBarOptions("Emotie-tijdlijn (per dag)", true)}
+              data={emotionTimelineChart}
+            />
+          </div>
+
+          {/* Hovered options */}
+          <div className="chart-container" style={{ height: 380 }}>
+            <Bar
+              options={baseBarOptions("Meest gehoverde opties (top 10)")}
+              data={{
+                labels: hoveredOptionsChart.labels.length ? hoveredOptionsChart.labels : ["(geen data)"],
+                datasets: [
+                  {
+                    label: "Hovers",
+                    data: hoveredOptionsChart.data.length ? hoveredOptionsChart.data : [0],
+                    backgroundColor: "rgba(79, 70, 229, 0.20)",
+                    borderColor: "#4f46e5",
+                    borderWidth: 2,
+                  },
+                ],
+              }}
+            />
+          </div>
+
+          {/* Dog metrics: water */}
+          <div className="chart-container" style={{ height: 360 }}>
+            <Line
+              options={baseLineOptions("Water per dag (gemiddeld, ml)")}
+              data={{
+                labels: dogMetricsCharts.labels,
+                datasets: [
+                  {
+                    label: "Water (ml)",
+                    data: dogMetricsCharts.waterData,
+                    borderColor: "#06b6d4",
+                    backgroundColor: "rgba(6, 182, 212, 0.18)",
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: 2,
+                  },
+                ],
+              }}
+            />
+          </div>
+
+          {/* Dog metrics: sleep */}
+          <div className="chart-container" style={{ height: 360 }}>
+            <Line
+              options={baseLineOptions("Slaap per dag (gemiddeld, uren)")}
+              data={{
+                labels: dogMetricsCharts.labels,
+                datasets: [
+                  {
+                    label: "Slaap (uren)",
+                    data: dogMetricsCharts.sleepData,
+                    borderColor: "#10b981",
+                    backgroundColor: "rgba(16, 185, 129, 0.18)",
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: 2,
+                  },
+                ],
+              }}
+            />
+          </div>
+
+          {/* Dog metrics: walks */}
+          <div className="chart-container" style={{ height: 360 }}>
+            <Line
+              options={baseLineOptions("Wandelingen per dag (gemiddeld)")}
+              data={{
+                labels: dogMetricsCharts.labels,
+                datasets: [
+                  {
+                    label: "Wandelingen",
+                    data: dogMetricsCharts.walksData,
+                    borderColor: "#f59e0b",
+                    backgroundColor: "rgba(245, 158, 11, 0.20)",
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: 2,
+                  },
+                ],
+              }}
             />
           </div>
         </div>
       </section>
 
-      <section className="top-events-section">
-        <h2>🔝 Meest Gebruikte Functies</h2>
-        <div className="events-list">
-          {analyticsStats.topEvents.map((event, index) => (
-            <div key={index} className="event-item">
-              <span className="event-rank">#{index + 1}</span>
-              <span className="event-name">{event.name}</span>
-              <span className="event-count">{event.count} keer</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
+      {/* Sessions table */}
       <section className="sessions-section">
-        <h2>🕒 Recente Sessions</h2>
+        <h2>🕒 Recente sessions</h2>
         <div className="sessions-table">
           <div className="table-header">
             <div>Login Tijd</div>
@@ -429,18 +730,19 @@ const Analytics = () => {
             <div>Page Views</div>
             <div>Status</div>
           </div>
-          {sessions.slice(0, 10).map((session, index) => (
-            <div key={index} className="table-row">
-              <div>{new Date(session.createdAt).toLocaleString('nl-NL')}</div>
+
+          {filteredSessions.slice(0, 10).map((s, idx) => (
+            <div key={idx} className="table-row">
+              <div>{new Date(s.createdAt).toLocaleString("nl-NL")}</div>
               <div>
-                {session.calculatedDuration
-                  ? Math.round(session.calculatedDuration / 1000 / 60) + ' min'
-                  : 'Onbekend'}
+                {s.calculatedDuration
+                  ? Math.round(clampNumber(s.calculatedDuration, 0) / 1000 / 60) + " min"
+                  : "Onbekend"}
               </div>
-              <div>{session.pageViews || 0}</div>
+              <div>{clampNumber(s.pageViews, 0)}</div>
               <div>
-                <span className={`session-status ${session.isActive ? 'active' : 'inactive'}`}>
-                  {session.isActive ? 'Actief' : 'Inactief'}
+                <span className={`session-status ${s.isActive ? "active" : "inactive"}`}>
+                  {s.isActive ? "Actief" : "Inactief"}
                 </span>
               </div>
             </div>
@@ -449,6 +751,4 @@ const Analytics = () => {
       </section>
     </div>
   );
-};
-
-export default Analytics;
+}
