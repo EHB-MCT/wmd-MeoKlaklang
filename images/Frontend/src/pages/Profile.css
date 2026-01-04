@@ -1,0 +1,555 @@
+/* ================================
+   PROFILE / DASHBOARD CSS (NEW)
+   Drop-in replacement for Profile.css
+================================== */
+
+/* ========== GLOBAL RESET ========== */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", "Segoe UI", "Roboto", sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #0f172a;
+  min-height: 100vh;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ========== MAIN CONTAINER ========== */
+.profile-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.98);
+  min-height: 100vh;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  border-radius: 22px;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========== LOADING ========== */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  height: 50vh;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ========== HEADER ========== */
+.profile-header {
+  margin-bottom: 30px;
+  padding: 44px 44px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 22px;
+  color: white;
+  box-shadow: 0 14px 42px rgba(102, 126, 234, 0.32);
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-header::before {
+  content: "";
+  position: absolute;
+  top: -60%;
+  right: -60%;
+  width: 220%;
+  height: 220%;
+  background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.12); opacity: 0.32; }
+}
+
+.profile-header h1 {
+  margin: 0;
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.12);
+  position: relative;
+  z-index: 1;
+}
+
+.profile-header p {
+  margin: 12px 0 0 0;
+  font-size: 1.15rem;
+  opacity: 0.92;
+  font-weight: 300;
+  position: relative;
+  z-index: 1;
+}
+
+/* Optional area if you keep stats at top */
+.header-stats {
+  margin-top: 26px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 18px 22px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transition: all 0.25s ease;
+  min-width: 140px;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.stat-number {
+  display: block;
+  font-size: 2.1rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  opacity: 0.92;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* ========== NAV BAR (if you still use it) ========== */
+.nav-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0 34px 0;
+  padding: 18px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  flex-wrap: wrap;
+}
+
+.nav-bar button {
+  padding: 14px 22px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 0.98rem;
+}
+
+.nav-bar button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+}
+
+.nav-bar button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 10px 22px rgba(102, 126, 234, 0.32);
+}
+
+/* ========== PERIOD SELECTOR (if present) ========== */
+.period-selector {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
+}
+
+.period-selector label {
+  font-weight: 800;
+  color: #334155;
+  font-size: 1rem;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.period-btn {
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.period-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.period-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.25);
+}
+
+/* ========== DOG SECTION WRAPPER (NEW) ========== */
+.dog-section {
+  background: #ffffff;
+  padding: 34px;
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.08);
+  margin-bottom: 34px;
+  border: 1px solid #eef2ff;
+}
+
+/* ========== DOG OVERVIEW CARD (component) ========== */
+.dog-overview-card {
+  border-radius: 22px;
+  padding: 34px;
+  border: 2px solid #e2e8f0;
+  background: linear-gradient(135deg, rgba(102,126,234,0.05) 0%, rgba(118,75,162,0.05) 100%);
+  transition: all 0.25s ease;
+}
+
+.dog-overview-card:hover {
+  transform: translateY(-4px);
+  border-color: #667eea;
+  box-shadow: 0 18px 40px rgba(102, 126, 234, 0.16);
+}
+
+.dog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.dog-header h3 {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.dog-header span {
+  color: #64748b;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.dog-stats {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.dog-stats > div {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px 14px;
+  text-align: center;
+  transition: all 0.25s ease;
+}
+
+.dog-stats > div:hover {
+  transform: translateY(-2px);
+  border-color: #667eea;
+  background: #f8fafc;
+}
+
+.dog-stats strong {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: #667eea;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+
+.dog-stats span {
+  display: block;
+  font-size: 0.88rem;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* ========== DOG TIPS ========== */
+.dog-tips {
+  margin-top: 26px;
+}
+
+.dog-tips h4 {
+  margin: 0 0 14px 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+}
+
+.tip-ok {
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-weight: 800;
+}
+
+.tip-card {
+  padding: 24px;
+  border-radius: 16px;
+  margin-bottom: 18px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.tip-card h5 {
+  margin: 0 0 10px 0;
+  font-size: 1.18rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.tip-card p {
+  margin: 0 0 14px 0;
+  font-size: 1rem;
+  color: #334155;
+  font-weight: 600;
+}
+
+.tip-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.tip-card li {
+  margin-bottom: 8px;
+  font-size: 0.98rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+/* Tip severity styling */
+.tip-soft {
+  background: #f0fdf4;
+  border-left: 7px solid #22c55e;
+}
+
+.tip-medium {
+  background: #fffbeb;
+  border-left: 7px solid #f59e0b;
+}
+
+.tip-high {
+  background: #fef2f2;
+  border-left: 7px solid #ef4444;
+}
+
+/* ========== BUTTONS ========== */
+.log-btn {
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 1.02rem;
+  letter-spacing: 0.3px;
+}
+
+.log-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(102, 126, 234, 0.30);
+}
+
+.log-btn:active {
+  transform: translateY(-1px);
+}
+
+/* ========== EMPTY STATE (if you still use it) ========== */
+.empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  margin-top: 20px;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 14px;
+  opacity: 0.75;
+}
+
+.empty-state h2 {
+  margin: 0 0 10px 0;
+  color: #0f172a;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.empty-state p {
+  margin: 0 0 22px 0;
+  color: #64748b;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.primary-button {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 1rem;
+}
+
+.primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(102, 126, 234, 0.28);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .profile-container {
+    padding: 26px;
+  }
+
+  .dog-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 18px;
+  }
+
+  .profile-header {
+    padding: 28px 22px;
+  }
+
+  .profile-header h1 {
+    font-size: 2rem;
+  }
+
+  .profile-header p {
+    font-size: 1rem;
+  }
+
+  .dog-section {
+    padding: 22px;
+  }
+
+  .dog-overview-card {
+    padding: 22px;
+  }
+
+  .dog-header h3 {
+    font-size: 1.55rem;
+  }
+
+  .dog-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .tip-card {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .nav-bar {
+    padding: 14px;
+  }
+
+  .nav-bar button {
+    width: 100%;
+  }
+
+  .dog-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .log-btn {
+    font-size: 1rem;
+  }
+}

@@ -1,0 +1,86 @@
+PROMPTS & OPENCODE AND CHAT ChatGPT CONVERSATIONS – DEV 5 PROJECT
+
+This file documents the use of AI (ChatGPT) during the development of this project.
+AI was used as a support tool for reasoning, debugging, refactoring, and conceptual guidance.
+All final decisions, implementations, and integrations were made by the student.
+
+--------------------------------------------------
+1. PROJECT STRUCTURE & CONCEPT
+--------------------------------------------------
+
+Prompt:
+"I need to build a Weapon of Math Destruction project for Dev 5. 
+Can you help me understand how to collect user-level data and subtly influence users?"
+
+Use:
+- Understanding the concept of Weapon of Math Destruction
+- Translating theory into a practical software project
+- Defining what kind of data could be collected ethically and technically
+
+--------------------------------------------------
+2. BACKEND & DATA COLLECTION
+--------------------------------------------------
+
+Prompt:
+"How can I structure a backend that collects sessions, analytics events, and user interactions?"
+
+Use:
+- Designing MongoDB schemas
+- Structuring analytics events
+- Session tracking (logins, durations, page views)
+- Understanding how to link all data to a unique user ID
+
+--------------------------------------------------
+3. ADMIN DASHBOARD
+--------------------------------------------------
+
+Prompt:
+"I need an admin dashboard where an administrator can view, filter, and analyze user data.
+What kind of data should be visible and how should it be structured?"
+
+Use:
+- Deciding which data is meaningful for admins
+- Filtering users
+- Viewing analytics per user
+- Understanding how admin tools can influence decision-making
+
+--------------------------------------------------
+4. FRONTEND ANALYTICS & VISUALIZATION
+--------------------------------------------------
+
+Prompt:
+"I want to visualize user behavior and dog health data in charts.
+What kind of graphs make sense and how can I avoid redundant charts?"
+
+Use:
+- Choosing appropriate chart types (line charts, bar charts)
+- Removing unnecessary visualizations (e.g. heatmaps)
+- Improving readability and clarity of data
+- Structuring analytics pages logically
+
+--------------------------------------------------
+5. COMPONENTIZATION & CODE CLEANUP
+--------------------------------------------------
+
+Prompt:
+"My Analytics page is becoming very large. How can I split this into components?"
+
+Use:
+- Splitting logic into hooks and helper files
+- Creating reusable components
+- Improving maintainability and readability
+- Fixing import/export issues
+
+--------------------------------------------------
+6. DEBUGGING & ERROR RESOLUTION
+--------------------------------------------------
+
+Prompt:
+"I am getting import errors, Chart.js plugin errors, and backend connection issues.
+Can you help me understand what is wrong?"
+
+Use:
+- Debugging Vite import errors
+- Fixing missing exports
+- Registering Chart.js plugins correctly
+- Understanding error messages instead of blindly copying fixes

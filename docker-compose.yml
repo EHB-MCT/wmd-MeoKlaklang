@@ -1,0 +1,40 @@
+
+
+version: "3.8"
+
+services:
+  frontend:
+    build: 
+      context: ./images/Frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://localhost:5003
+    depends_on:
+      - backend
+
+  backend:
+    build: 
+      context: ./images/Backend
+      dockerfile: Dockerfile
+    ports:
+      - "5003:5005"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URL=${MONGO_URL}
+      - NODE_ENV=${NODE_ENV}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
