@@ -116,4 +116,4 @@ From this project, I learned:
 - How flawed data can still lead to strong conclusions
 - Why ethical reflection is essential in data-driven systems
 
-This project made clear how powerful — and potentially dangerous — data-driven applications can be when they scale.
+This project made me also learn that AI can help you with alot, but AI can also make everything alot more difficuclt and complexer then it already was.

@@ -1,5 +1,7 @@
 
 
+version: "3.8"
+
 services:
   frontend:
     build: 
@@ -21,8 +23,10 @@ services:
     depends_on:
       - mongo
     environment:
-      - MONGO_URL=mongodb://mongo:27017/petlog
-      - NODE_ENV=development
+      - MONGO_URL=${MONGO_URL}
+      - NODE_ENV=${NODE_ENV}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
 
   mongo:
     image: mongo:7
