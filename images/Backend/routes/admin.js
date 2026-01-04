@@ -161,6 +161,68 @@ router.put("/user/:userId/deactivate", async (req, res) => {
 });
 
 // ===========================
+// DELETE USER
+// ===========================
+router.delete("/user/:userId/delete", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const db = require("../db").getDB();
+    const { ObjectId } = require("mongodb");
+    
+    // Check if user exists
+    const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    }
+    
+    console.log(`🗑️ Deleting user: ${user.name} (${userId}) and all associated data`);
+    
+    // Delete user and all associated data
+    const deletePromises = [
+      // Delete user
+      db.collection("users").deleteOne({ _id: new ObjectId(userId) }),
+      
+      // Delete user's dogs
+      db.collection("dogs").deleteMany({ userId: new ObjectId(userId) }),
+      
+      // Delete user's entries
+      db.collection("entries").deleteMany({ userId: new ObjectId(userId) }),
+      
+      // Delete user's sessions
+      db.collection("sessions").deleteMany({ userId: userId }),
+      
+      // Delete user's events/analytics
+      db.collection("events").deleteMany({ 
+        $or: [
+          { userId: userId },
+          { userId: new ObjectId(userId) }
+        ]
+      })
+    ];
+    
+    const results = await Promise.all(deletePromises);
+    
+    console.log(`✅ Deleted: ${results[0].deletedCount} users, ${results[1].deletedCount} dogs, ${results[2].deletedCount} entries, ${results[3].deletedCount} sessions, ${results[4].deletedCount} events`);
+    
+    res.json({
+      success: true,
+      message: "Gebruiker en alle bijbehorende data permanent verwijderd",
+      deletedCounts: {
+        users: results[0].deletedCount,
+        dogs: results[1].deletedCount,
+        entries: results[2].deletedCount,
+        sessions: results[3].deletedCount,
+        events: results[4].deletedCount
+      }
+    });
+    
+  } catch (err) {
+    console.error("❌ Fout bij verwijderen gebruiker:", err);
+    res.status(500).json({ error: "Fout bij verwijderen gebruiker" });
+  }
+});
+
+// ===========================
 // ADMIN DASHBOARD STATS
 // ===========================
 router.get("/stats", async (req, res) => {
